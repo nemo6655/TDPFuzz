@@ -1,0 +1,11 @@
+tmp/
+!tmp/elfuzz_baselines.tar.zst
+!tmp/isla/
+!tmp/islearn/
+/evaluation/binary/
+/evaluation/workdir/
+!/evaluation/workdir/*.py
+!/evaluation/workdir/*.toml
+!/evaluation/workdir/*.xsh
+/preset/**/gen*/
+/extradata/
