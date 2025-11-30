@@ -1,0 +1,248 @@
+diff --git a/afl-fuzz.c b/afl-fuzz.c
+index 8023451..5d93f71 100644
+--- a/afl-fuzz.c
++++ b/afl-fuzz.c
+@@ -544,6 +544,14 @@ u8* choose_source_region(u32 *out_len) {
+     index--;
+   }
+ 
++  // Skip failed seeds
++  while (q && q->cal_failed) q = q->next;
++  if (!q) {
++      q = queue;
++      while (q && q->cal_failed) q = q->next;
++  }
++  if (!q) return NULL;
++
+   //randomly select a region in the selected seed
+   if (q->region_count) {
+     u32 reg_index = UR(q->region_count);
+@@ -554,9 +562,15 @@ u8* choose_source_region(u32 *out_len) {
+       *out_len = len;
+       //Read region data into memory. */
+       FILE *fp = fopen(q->fname, "rb");
+-      fseek(fp, q->regions[reg_index].start_byte, SEEK_CUR);
+-      fread(out, 1, len, fp);
+-      fclose(fp);
++      if (fp) {
++        fseek(fp, q->regions[reg_index].start_byte, SEEK_CUR);
++        fread(out, 1, len, fp);
++        fclose(fp);
++      } else {
++        ck_free(out);
++        out = NULL;
++        *out_len = 0;
++      }
+     }
+   }
+ 
+@@ -691,13 +705,31 @@ struct queue_entry *choose_seed(u32 target_state_id, u8 mode)
+ 
+     switch (mode) {
+       case RANDOM_SELECTION: //Random seed selection
+-        state->selected_seed_index = UR(state->seeds_count);
+-        result = state->seeds[state->selected_seed_index];
++        {
++          u32 start_index = UR(state->seeds_count);
++          state->selected_seed_index = start_index;
++          u32 i = 0;
++          do {
++             result = state->seeds[state->selected_seed_index];
++             if (!result->cal_failed) break;
++             state->selected_seed_index = (state->selected_seed_index + 1) % state->seeds_count;
++             i++;
++          } while (i < state->seeds_count);
++          if (i == state->seeds_count) result = NULL;
++        }
+         break;
+       case ROUND_ROBIN: //Round-robin seed selection
+-        result = state->seeds[state->selected_seed_index];
+-        state->selected_seed_index++;
+-        if (state->selected_seed_index == state->seeds_count) state->selected_seed_index = 0;
++        {
++          u32 i = 0;
++          do {
++            result = state->seeds[state->selected_seed_index];
++            state->selected_seed_index++;
++            if (state->selected_seed_index == state->seeds_count) state->selected_seed_index = 0;
++            if (!result->cal_failed) break;
++            i++;
++          } while (i < state->seeds_count);
++          if (i == state->seeds_count) result = NULL;
++        }
+         break;
+       case FAVOR:
+         if (state->seeds_count > 10) {
+@@ -711,6 +743,8 @@ struct queue_entry *choose_seed(u32 target_state_id, u8 mode)
+               passed_cycles++;
+             } else state->selected_seed_index++;
+ 
++            if (result->cal_failed) continue;
++
+             //Skip this seed with high probability if it is neither an initial seed nor a seed generated while the
+             //current target_state_id was targeted
+             if (result->generating_state_id != target_state_id && !result->is_initial_seed && UR(100) < 90) continue;
+@@ -772,7 +806,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
+   if (is_state_sequence_interesting(state_sequence, state_count)) {
+     //Save the current kl_messages to a file which can be used to replay the newly discovered paths on the ipsm
+     u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
+-    u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, dry_run ? basename(q->fname) : "new");
++    u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, basename(q->fname));
+     save_kl_messages_to_file(kl_messages, fname, 1, messages_sent);
+     ck_free(temp_str);
+     ck_free(fname);
+@@ -2327,9 +2361,9 @@ static void read_testcases(void) {
+ 
+     }
+ 
+-    if (st.st_size > MAX_FILE)
+-      FATAL("Test case '%s' is too big (%s, limit is %s)", fn,
+-            DMS(st.st_size), DMS(MAX_FILE));
++    // if (st.st_size > MAX_FILE)
++    //   FATAL("Test case '%s' is too big (%s, limit is %s)", fn,
++    //         DMS(st.st_size), DMS(MAX_FILE));
+ 
+     /* Check for metadata that indicates that deterministic fuzzing
+        is complete for this entry. We don't want to repeat deterministic
+@@ -3482,6 +3516,55 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
+ 
+   update_bitmap_score(q);
+ 
++  /* Save coverage for the current seed */
++  u8* cov_fn = (u8*)strrchr((char*)q->fname, '/');
++  if (cov_fn) cov_fn++; else cov_fn = q->fname;
++
++  unsigned int state_count = 0;
++  unsigned int *state_sequence = NULL;
++  u8 *state_str = NULL;
++
++  if (response_buf && response_buf_size > 0 && extract_response_codes) {
++      state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
++      if (state_sequence) {
++          state_str = state_sequence_to_string(state_sequence, state_count);
++          ck_free(state_sequence);
++      }
++  }
++
++  u8* cov_dir = alloc_printf("%s/queue/.state/seed_cov", out_dir);
++  if (access((char*)cov_dir, F_OK) != 0) {
++      if (mkdir((char*)cov_dir, 0700)) {
++          if (errno != EEXIST) WARNF("Unable to create '%s'", cov_dir);
++      }
++  }
++  
++  u8* cov_path;
++  if (state_str) {
++      cov_path = alloc_printf("%s/%s:state:%s", cov_dir, cov_fn, state_str);
++      ck_free(state_str);
++  } else {
++      cov_path = alloc_printf("%s/%s", cov_dir, cov_fn);
++  }
++  ck_free(cov_dir);
++
++  s32 cov_fd = open((char*)cov_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
++  if (cov_fd >= 0) {
++      FILE* f = fdopen(cov_fd, "w");
++      if (f) {
++          u32 i;
++          for (i = 0; i < MAP_SIZE; i++) {
++              if (trace_bits[i]) {
++                  fprintf(f, "%06u:%u\n", i, trace_bits[i]);
++              }
++          }
++          fclose(f);
++      } else {
++          close(cov_fd);
++      }
++  }
++  ck_free(cov_path);
++
+   /* If this case didn't result in new output from the instrumentation, tell
+      parent. This is a non-critical problem, but something to warn the user
+      about. */
+@@ -3573,7 +3656,7 @@ static void perform_dry_run(char** argv) {
+     ck_free(use_mem);
+ 
+     /* Update state-aware variables (e.g., state machine, regions and their annotations */
+-    if (state_aware_mode) update_state_aware_variables(q, 1);
++    if (state_aware_mode && res != FAULT_CRASH) update_state_aware_variables(q, 1);
+ 
+     /* save the seed to file for replaying */
+     u8 *fn_replay = alloc_printf("%s/replayable-queue/%s", out_dir, basename(q->fname));
+@@ -3649,6 +3732,18 @@ static void perform_dry_run(char** argv) {
+           break;
+         }
+ 
++        {
++           u8* fn = strrchr(q->fname, '/') + 1;
++           WARNF("Test case '%s' results in a crash (moving to replayable-crashes)", fn);
++           u8* new_path = alloc_printf("%s/replayable-crashes/%s", out_dir, fn);
++           if (rename(q->fname, new_path)) PFATAL("Unable to move '%s' to '%s'", q->fname, new_path);
++           ck_free(new_path);
++
++           q->cal_failed = CAL_CHANCES;
++           cal_failures++;
++           break;
++        }
++
+         if (mem_limit) {
+ 
+           SAYF("\n" cLRD "[-] " cRST
+@@ -3666,7 +3761,8 @@ static void perform_dry_run(char** argv) {
+ 
+ #ifdef RLIMIT_AS
+                "      ( ulimit -Sv $[%llu << 10]; /path/to/binary [...] <testcase )\n\n"
+-#else
++
++               #else
+                "      ( ulimit -Sd $[%llu << 10]; /path/to/binary [...] <testcase )\n\n"
+ #endif /* ^RLIMIT_AS */
+ 
+@@ -3995,6 +4091,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
+ 
+     fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
+                       describe_op(hnb));
++    
+ 
+ #else
+ 
+@@ -4624,6 +4721,10 @@ static void maybe_delete_out_dir(void) {
+   if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+   ck_free(fn);
+ 
++  fn = alloc_printf("%s/queue/.state/seed_cov", out_dir);
++  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
++  ck_free(fn);
++
+   /* Then, get rid of the .state subdirectory itself (should be empty by now)
+      and everything matching <out_dir>/queue/id:*. */
+ 
+@@ -5821,6 +5922,8 @@ static u8 fuzz_one(char** argv) {
+ 
+   u8  ret_val = 1, doing_det = 0;
+ 
++  if (queue_cur->cal_failed) return 1;
++
+   u8  a_collect[MAX_AUTO_EXTRA];
+   u32 a_len = 0;
+ 
+@@ -7542,7 +7645,7 @@ retry_splicing:
+ 
+     /* Make sure that the target has a reasonable length. */
+ 
+-    while (target && (target->len < 2 || target == queue_cur)) {
++    while (target && (target->len < 2 || target == queue_cur || target->cal_failed)) {
+       target = target->next;
+       splicing_with++;
+     }
+@@ -8174,6 +8277,10 @@ EXP_ST void setup_dirs_fds(void) {
+   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
+   ck_free(tmp);
+ 
++  tmp = alloc_printf("%s/queue/.state/seed_cov/", out_dir);
++  if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
++  ck_free(tmp);
++
+   /* Sync directory for keeping track of cooperating fuzzers. */
+ 
+   if (sync_id) {

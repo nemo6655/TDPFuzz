@@ -1,0 +1,13 @@
+diff --git a/afl-fuzz.c b/afl-fuzz.c
+index 93b3548..408ffc6 100644
+--- a/afl-fuzz.c
++++ b/afl-fuzz.c
+@@ -773,7 +773,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
+   if (is_state_sequence_interesting(state_sequence, state_count)) {
+     //Save the current kl_messages to a file which can be used to replay the newly discovered paths on the ipsm
+     u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
+-    u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, dry_run ? basename(q->fname) : "new");
++    u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, basename(q->fname));
+     save_kl_messages_to_file(kl_messages, fname, 1, messages_sent);
+     ck_free(temp_str);
+     ck_free(fname);

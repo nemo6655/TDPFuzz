@@ -46,3 +46,22 @@ plot/table/*
 !plot/table/.gitkeep
 /extradata/*
 !/extradata/.gitkeep
+
+# New folders
+analysis/rq1/
+analysis/rq2/
+analysis/rq3/
+analysis/timecost/
+evaluation/alt_elmfuzzers/
+evaluation/binary/
+evaluation/elmfuzzers/
+evaluation/fr_adapt/cpython3/instrumented_bin/
+evaluation/fr_adapt/libxml2/instrumented_bin/
+evaluation/fr_adapt/sqlite3/instrumented_bin/
+evaluation/glade_oracle/
+evaluation/gramgen/
+evaluation/grammars/
+evaluation/islearn_adapt/oracles/
+evaluation/nocomp_fuzzers/
+evaluation/noinf_fuzzers/
+evaluation/nospl_fuzzers/

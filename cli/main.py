@@ -17,7 +17,8 @@ from pre_experiments import (
     synthesize_grammar,
     synthesize_semantics,
     produce,
-    produce_glade
+    produce_glade,
+    tdnet_fuzzer
 )
 from minimize import minimize_command
 from rq1 import rq1_seed_cov_cmd, rq1_afl_run, rq1_afl_update
@@ -101,7 +102,7 @@ def synthesize(target, benchmark, tgi_waiting, evolution_iterations, use_small_m
             return
     match target:
         case "fuzzer.elfuzz" | "fuzzer.elfuzz_nofs" | "fuzzer.elfuzz_nocp" | "fuzzer.elfuzz_noin" | "fuzzer.elfuzz_nosp":
-            synthesize_fuzzer(target.split(".")[1], benchmark, tgi_waiting=tgi_waiting, evolution_iterations=evolution_iterations, use_small_model=use_small_model)
+            tdnet_fuzzer(target.split(".")[1], benchmark, tgi_waiting=tgi_waiting, evolution_iterations=evolution_iterations, use_small_model=use_small_model)
             return
         case "grammar.glade":
             synthesize_grammar(benchmark)
@@ -111,6 +112,44 @@ def synthesize(target, benchmark, tgi_waiting, evolution_iterations, use_small_m
             return
         case _:
             click.echo(f"Target {target} for `synth` hasn't been implemented yet.")
+            return
+
+@cli.command(name="tdnet", help="Synthesize input generators for network protocols.")
+@click.option("--target", "-T", required=True, type=click.Choice(
+    ["fuzzer.elfuzz", "fuzzer.elfuzz_nofs", "fuzzer.elfuzz_nocp", "fuzzer.elfuzz_noin", "fuzzer.elfuzz_nosp",
+     "grammar.glade", "semantics.islearn"]
+))
+@click.argument("benchmark", required=True, type=click.Choice(
+    ["live555"]
+))
+@click.option("--tgi-waiting", "-w", type=int, default=DEFAULT_TGI_WAITING, show_default=True,
+              help="This option only works for targets <fuzzer.*>. It provides the estimated time in seconds to wait for the text-generation-inference server to be ready (after downloading the model files and \
+starting the service ). We need the user to provide the estimation as it is hard to know the \
+precise status of the server at runtime.  The default value should \
+be proper if you are in an area with a typical network condition (i.e., outside mainland China) and start the server for the first time. \
+If you have already started the server before, the cached model files can significantly shorten the waiting time. You may provide a smaller \
+value for the estimation.")
+@click.option("--evolution-iterations", "-n", type=int, default=50, show_default=True,
+              help="This option only works for fuzzer.elfuzz. It specifies the number of iterations for the LLM-driven evolution.")
+@click.option("--no-select-semantic-constraints", "--no-select", is_flag=True, default=False,
+              help="This option only works for semantics.islearn. If this option is set, the user should manually \
+select one semantic constraint from the mined semantic constraints \
+and put it into evaluation/islearn_adapt/selected/<benchmark>_isla<timetag>.isla. If this option is not set, \
+a random one from the constraints with the best recall and precision will be selected from the mined constraints and put into the file.")
+@click.option("--use-small-model", is_flag=True, default=False, help="Use Qwen2.5-Coder-1.5B instead of CodeLlama-13b-hf to verify the functionality on a GPU with limited VRAM. This option only works for targets <fuzzer.*>.")
+def tdnet(target, benchmark, tgi_waiting, evolution_iterations, use_small_model, no_select_semantic_constraints):
+    match target:
+        case "tdpfuzzer.tdpfuzzer" | "tdpfuzzer.tdpfuzzer_noss" | "tdpfuzzer.tdpfuzzer_nosm":
+            tdnet_fuzzer(target.split(".")[1], benchmark, tgi_waiting=tgi_waiting, evolution_iterations=evolution_iterations, use_small_model=use_small_model)
+            return
+        case "grammar.glade":
+            synthesize_grammar(benchmark)
+            return
+        case "semantics.islearn":
+            synthesize_semantics(benchmark, no_select=no_select_semantic_constraints)
+            return
+        case _:
+            click.echo(f"Target {target} for `tdnet` hasn't been implemented yet.")
             return
 
 @cli.command(name="config", help="Manage configuration.")

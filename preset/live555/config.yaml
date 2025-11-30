@@ -4,15 +4,16 @@
 
 # -------------------------------- Global options --------------------------------
 
-type: fuzzbench
-project_name: jsoncpp
-fuzzbench_project: jsoncpp_jsoncpp_fuzzer
+type: profuzzbench
+project_name: live555
+fuzzbench_project: live555_fuzzer
 
 # Options to configure the target program being fuzzed
 target:
   # srcs:
   # Path to the target binary with coverage instrumentation (default: None)
-  covbin: /out/jsoncpp_fuzzer
+  covbin: /out/live555_fuzzer
+  options: "-P RTSP -D 10000 -q 3 -s 3 -E -K -R"
 
 # Options to configure the model(s) used for variant generation
 model:
@@ -27,7 +28,7 @@ model:
 run:
   # Seed files (generator programs that will be mutated) (default: None)
   seeds:
-  - /home/appuser/elmfuzz/preset/jsoncpp/seed_genjson.py
+  - /home/appuser/elmfuzz/preset/live555/seed_genjson.py
   # Number of generations to run (default: 10)
   num_generations: 50
   # Selection strategy (one of: elites, best_of_generation) (default: elites)

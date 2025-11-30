@@ -109,6 +109,10 @@ def synthesize_grammar(benchmark):
     shutil.move(os.path.join(GLADE_DIR, gram_file_generated[0]), os.path.join(gram_dir, gram_file_generated[0]))
     click.echo(f"Grammar for {benchmark} synthesized successfully: {os.path.join(gram_dir, gram_file_generated[0])}.")
 
+
+
+
+
 def synthesize_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50, use_small_model=False):
     match target:
         case "elfuzz":
@@ -142,31 +146,31 @@ def synthesize_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iteration
     cmd_tgi = ["sudo", os.path.join(PROJECT_ROOT, "start_tgi_servers.sh" if not use_small_model else "start_tgi_servers_debug.sh")]
     click.echo(f"Starting the text-gneration-inference server. This may take a while as it has to download the model...")
 
-    try:
-        tgi_p = subprocess.Popen(" ".join(cmd_tgi), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                                 env=env, cwd=PROJECT_ROOT, user=USER, text=True)
-        start = datetime.now()
-        print(f"TGI server started at {start}.", flush=True)
-        poll_obj = select.poll()
-        assert tgi_p.stdout is not None, "TGI server stdout is None."
-        poll_obj.register(tgi_p.stdout, select.POLLIN)
-        while True:
-            if tgi_p.poll() is not None:
-                print("TGI server failed to start.", flush=True)
-                print("stderr:", flush=True)
-                print(tgi_p.stderr.read(), flush=True) # type: ignore
-                print("stdout:", flush=True)
-                print(tgi_p.stdout.read(), flush=True) # type: ignore
-                raise RuntimeError("TGI server failed to start.")
-            if (datetime.now() - start).total_seconds() > tgi_waiting:
-                break
-            if poll_obj.poll(20):
-                line = tgi_p.stdout.readline().strip()
-                if line:
-                    print(line, flush=True)
-        click.echo("Text-generation-inference server started.")
-    except Exception as e:
-        raise e
+    # try:
+    #     tgi_p = subprocess.Popen(" ".join(cmd_tgi), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+    #                              env=env, cwd=PROJECT_ROOT, user=USER, text=True)
+    #     start = datetime.now()
+    #     print(f"TGI server started at {start}.", flush=True)
+    #     poll_obj = select.poll()
+    #     assert tgi_p.stdout is not None, "TGI server stdout is None."
+    #     poll_obj.register(tgi_p.stdout, select.POLLIN)
+    #     while True:
+    #         if tgi_p.poll() is not None:
+    #             print("TGI server failed to start.", flush=True)
+    #             print("stderr:", flush=True)
+    #             print(tgi_p.stderr.read(), flush=True) # type: ignore
+    #             print("stdout:", flush=True)
+    #             print(tgi_p.stdout.read(), flush=True) # type: ignore
+    #             raise RuntimeError("TGI server failed to start.")
+    #         if (datetime.now() - start).total_seconds() > tgi_waiting:
+    #             break
+    #         if poll_obj.poll(20):
+    #             line = tgi_p.stdout.readline().strip()
+    #             if line:
+    #                 print(line, flush=True)
+    #     click.echo("Text-generation-inference server started.")
+    # except Exception as e:
+    #     raise e
 
     try:
         rundir = os.path.join("preset", benchmark)
@@ -175,6 +179,84 @@ def synthesize_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iteration
             cmd = ["sudo", "REPROUDCE_MODE=true", f"NUM_GENERATIONS={evolution_iterations}", os.path.join(PROJECT_ROOT, "all_gen.sh"), rundir]
         else:
             cmd = ["sudo", "REPROUDCE_MODE=true", os.path.join(PROJECT_ROOT, "all_gen.sh"), rundir]
+        print(f"Running command: {' '.join(cmd)}", flush=True)
+        subprocess.run(" ".join(cmd), check=True, shell=True, user=USER, cwd=PROJECT_ROOT, stdout=sys.stdout, stderr=sys.stderr)
+
+        match target:
+            case "elfuzz":
+                target_cap = "elfuzz"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "elmfuzzers")
+            case "elfuzz_nofs":
+                target_cap = "elfuzz_noFS"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "alt_elmfuzzers")
+            case "elfuzz_nocp":
+                target_cap = "elfuzz_noCompletion"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nocomp_fuzzers")
+            case "elfuzz_noin":
+                target_cap = "elfuzz_noInfilling"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "noinf_fuzzers")
+            case "elfuzz_nosp":
+                target_cap = "elfuzz_noSpl"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nospl_fuzzers")
+
+        evolution_record_dir = os.path.join(PROJECT_ROOT, "extradata", "evolution_record", target_cap)
+        if not os.path.exists(evolution_record_dir):
+            os.makedirs(evolution_record_dir)
+        else:
+            for file in os.listdir(evolution_record_dir):
+                os.remove(os.path.join(evolution_record_dir, file))
+        tar_evolution_cmd = ["tar", "-cJf", os.path.join(evolution_record_dir, "evolution.tar.xz"), rundir]
+        subprocess.run(tar_evolution_cmd, check=True, cwd=PROJECT_ROOT)
+
+        if not os.path.exists(fuzzer_dir):
+            os.makedirs(fuzzer_dir)
+        else:
+            for file in os.listdir(fuzzer_dir):
+                os.remove(os.path.join(fuzzer_dir, file))
+        datesuffix = datetime.now().strftime("%y%m%d")
+        with tempfile.TemporaryDirectory() as tmpdir_raw:
+            result_name = f"{benchmark}_{datesuffix}.fuzzers"
+            tmpdir = os.path.join(tmpdir_raw, result_name)
+            os.makedirs(tmpdir, exist_ok=True)
+            result_dir = os.path.join(PROJECT_ROOT, rundir, f"gen{evolution_iterations}", "seeds")
+            for file in os.listdir(result_dir):
+                shutil.copy(os.path.join(result_dir, file), tmpdir)
+            tar_result_cmd = ["tar", "-cJf", os.path.join(fuzzer_dir, f"{result_name}.tar.xz"), "-C", tmpdir_raw, result_name]
+            subprocess.run(tar_result_cmd, check=True, cwd=PROJECT_ROOT)
+
+        click.echo(f"Fuzzer synthesized for {benchmark} by {target}")
+    finally:
+        subprocess.run(["sudo", "docker", "stop", "tgi-server"], check=True, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50, use_small_model=False):
+    match target:
+        case "tdpfuzzer":
+            env = os.environ.copy() | {
+                "SELECTION_STRATEGY": "lattice",
+                "ELFUZZ_FORBIDDEN_MUTATORS": ""
+            }
+        case "tdpfuzzer_noss":
+            env = os.environ.copy() | {
+                "SELECTION_STRATEGY": "elites",
+                "ELFUZZ_FORBIDDEN_MUTATORS": "",
+            }
+        case "tdpfuzzer_nosm":
+            env = os.environ.copy() | {
+                "SELECTION_STRATEGY": "lattice",
+                "ELFUZZ_FORBIDDEN_MUTATORS": "complete",
+            }
+        case _:
+            raise ValueError(f"Unknown target: {target}")
+
+
+
+    try:
+        rundir = os.path.join("preset", benchmark)
+
+        if evolution_iterations != 50:
+            cmd = ["sudo", "REPROUDCE_MODE=true", f"NUM_GENERATIONS={evolution_iterations}", os.path.join(PROJECT_ROOT, "all_gen_net.sh"), rundir]
+        else:
+            cmd = ["sudo", "REPROUDCE_MODE=true", os.path.join(PROJECT_ROOT, "all_gen_net.sh"), rundir]
         print(f"Running command: {' '.join(cmd)}", flush=True)
         subprocess.run(" ".join(cmd), check=True, shell=True, user=USER, cwd=PROJECT_ROOT, stdout=sys.stdout, stderr=sys.stderr)
 

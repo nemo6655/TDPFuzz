@@ -1,0 +1,94 @@
+diff --git a/afl-fuzz.c b/afl-fuzz.c
+index 8023451..9165765 100644
+--- a/afl-fuzz.c
++++ b/afl-fuzz.c
+@@ -772,7 +772,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
+   if (is_state_sequence_interesting(state_sequence, state_count)) {
+     //Save the current kl_messages to a file which can be used to replay the newly discovered paths on the ipsm
+     u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
+-    u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, dry_run ? basename(q->fname) : "new");
++    u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, basename(q->fname));
+     save_kl_messages_to_file(kl_messages, fname, 1, messages_sent);
+     ck_free(temp_str);
+     ck_free(fname);
+@@ -2327,9 +2327,9 @@ static void read_testcases(void) {
+ 
+     }
+ 
+-    if (st.st_size > MAX_FILE)
+-      FATAL("Test case '%s' is too big (%s, limit is %s)", fn,
+-            DMS(st.st_size), DMS(MAX_FILE));
++    // if (st.st_size > MAX_FILE)
++    //   FATAL("Test case '%s' is too big (%s, limit is %s)", fn,
++    //         DMS(st.st_size), DMS(MAX_FILE));
+ 
+     /* Check for metadata that indicates that deterministic fuzzing
+        is complete for this entry. We don't want to repeat deterministic
+@@ -3482,6 +3482,37 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
+ 
+   update_bitmap_score(q);
+ 
++  /* Save coverage for the current seed */
++  u8* cov_fn = (u8*)strrchr((char*)q->fname, '/');
++  if (cov_fn) cov_fn++; else cov_fn = q->fname;
++
++  u8* cov_dir = alloc_printf("%s/queue/.state/seed_cov", out_dir);
++  if (access((char*)cov_dir, F_OK) != 0) {
++      if (mkdir((char*)cov_dir, 0700)) {
++          if (errno != EEXIST) WARNF("Unable to create '%s'", cov_dir);
++      }
++  }
++  
++  u8* cov_path = alloc_printf("%s/%s", cov_dir, cov_fn);
++  ck_free(cov_dir);
++
++  s32 cov_fd = open((char*)cov_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
++  if (cov_fd >= 0) {
++      FILE* f = fdopen(cov_fd, "w");
++      if (f) {
++          u32 i;
++          for (i = 0; i < MAP_SIZE; i++) {
++              if (trace_bits[i]) {
++                  fprintf(f, "%06u:%u\n", i, trace_bits[i]);
++              }
++          }
++          fclose(f);
++      } else {
++          close(cov_fd);
++      }
++  }
++  ck_free(cov_path);
++
+   /* If this case didn't result in new output from the instrumentation, tell
+      parent. This is a non-critical problem, but something to warn the user
+      about. */
+@@ -3995,6 +4026,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
+ 
+     fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
+                       describe_op(hnb));
++    
+ 
+ #else
+ 
+@@ -4624,6 +4656,10 @@ static void maybe_delete_out_dir(void) {
+   if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+   ck_free(fn);
+ 
++  fn = alloc_printf("%s/queue/.state/seed_cov", out_dir);
++  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
++  ck_free(fn);
++
+   /* Then, get rid of the .state subdirectory itself (should be empty by now)
+      and everything matching <out_dir>/queue/id:*. */
+ 
+@@ -8174,6 +8210,10 @@ EXP_ST void setup_dirs_fds(void) {
+   if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
+   ck_free(tmp);
+ 
++  tmp = alloc_printf("%s/queue/.state/seed_cov/", out_dir);
++  if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
++  ck_free(tmp);
++
+   /* Sync directory for keeping track of cooperating fuzzers. */
+ 
+   if (sync_id) {

@@ -68,8 +68,12 @@ def convert_conf_item(key: str, val: Any, args: Namespace, parser: ArgumentParse
             elif opt.nargs in ['+', '*'] or isinstance(opt.nargs, int) and opt.nargs > 1:
                 # Make sure val is a list
                 if not isinstance(val, list):
-                    print(f"Warning: {key} should be a list, but is {type(val)}; skipping", file=sys.stderr)
-                    return
+                    # If it's a string, try to split it into a list
+                    if isinstance(val, str):
+                        val = val.split()
+                    else:
+                        print(f"Warning: {key} should be a list, but is {type(val)}; skipping", file=sys.stderr)
+                        return
                 # Convert each item in the list
                 conv = [ type_conv(v) for v in val ]
                 opt(parser, args, conv, f'--{key}')
@@ -304,6 +308,8 @@ class ELMFuzzConfig:
         self.subgroup_help['target'] = 'Options to configure the target program being fuzzed'
         group.add_argument("--target.srcs", type=Path, nargs='+', action='extend',
                            help="Source files in the target")
+        group.add_argument("--target.options", type=str, nargs='+', action='extend',
+                           help="Options to pass to the target program")
         group.add_argument("--target.covbin", type=Path,
                            help="Path to the target binary with coverage instrumentation")
         self.subgroup_help['model'] = 'Options to configure the model(s) used for variant generation'
