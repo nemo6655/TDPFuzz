@@ -30,7 +30,7 @@ from drive_log import setup_custom_logger
 logger = setup_custom_logger('root')
 
 from tqdm import tqdm
-from driver import ExceptionInfo, Result, ResultInfo, GenResult
+from driver_net import ExceptionInfo, Result, ResultInfo, GenResult
 
 # Global color cycle with ANSI colors
 COLOR_GREEN = '\033[92m'
@@ -313,12 +313,19 @@ def generate_corpus(module_path, input_seeds: str, worker_dir, args):
     copied_module_name = os.path.join(worker_dir, module_name)
     shutil.copyfile(module_path, copied_module_name)
     actual_module_name = os.path.join(worker_dir, module_name)
-    outdir = os.path.join(worker_dir, "output")
+    
+    # Force single iteration
+    args.driver.num_iterations = 1
+    
+    # Flat output structure
+    module_base = os.path.splitext(module_name)[0]
+    outdir = os.path.join(args.output_dir, module_base)
+
     logfile_name = f'logfile.json'
     actual_logfile_name = os.path.join(worker_dir, logfile_name)
     # if not args.driver.real_feedback:
     cmd = [
-        'python', 'driver.py',
+        'python', 'driver_net.py',
         '-n', str(args.driver.num_iterations),
         '-o', outdir,
         '-L', actual_logfile_name,
@@ -478,10 +485,13 @@ def main():
     from idontwannadoresearch.txdm import txdm
     from elmconfig import ELMFuzzConfig
     parser = make_parser()
-    config = ELMFuzzConfig(parents={'genoutputs': parser})
+    config = ELMFuzzConfig(prog='genoutputs', parents={'genoutputs': parser})
     init_parser(config)
     args = config.parse_args()
     logger.setLevel(logging.INFO)
+
+    # Force num_iterations to 1 globally
+    args.driver.num_iterations = 1
 
     if args.logfile is not None:
         output_log = open(args.logfile, 'w')
@@ -502,11 +512,13 @@ def main():
 
     ELMFUZZ_RUNDIR = os.environ.get('ELMFUZZ_RUNDIR', '.')
     
-    assert gen.startswith('gen')
-    if resample != -1:
+    seed_input_dir = get_seed_input_dir()
+    if seed_input_dir is None:
+        input_seeds_str = ""
+    elif resample != -1:
+        assert gen.startswith('gen')
         if int(gen.removeprefix('gen')) % resample == 0:
             print('INFO: Resample seed inputs')
-            seed_input_dir = get_seed_input_dir()
             assert seed_input_dir is not None
             seed_inputs_raw = []
             for p, ds, fs in os.walk(seed_input_dir):
@@ -534,7 +546,6 @@ def main():
         tmp = get_seed_input_samples()
         assert tmp is None or tmp == -1
         seed_inputs_raw = []
-        seed_input_dir = get_seed_input_dir()
         assert seed_input_dir is not None
         for p, ds, fs in os.walk(seed_input_dir):
             for f in fs:
@@ -554,7 +565,9 @@ def main():
             module_path = module_path.strip()
             # Make an output directory for this module's outputs
             module_base = os.path.splitext(os.path.basename(module_path))[0]
-            worker_dir = os.path.join(args.output_dir, module_base)
+            
+            # Use a temp dir for worker files to keep output clean
+            worker_dir = os.path.join(args.output_dir, ".work", module_base)
             os.makedirs(worker_dir, exist_ok=True)
             future = executor.submit(
                 generate_corpus,
@@ -577,9 +590,7 @@ def main():
                     result_type = GenResult.Error,
                     function_name = args.driver.function_name,
                 )
-                print(json.dumps({
-                    'error': ExceptionInfo.from_exception(e, module_path),
-                }), file=output_log)
+                print(res.json(), file=output_log)
         progress.close()
 
     if output_log != sys.stdout:

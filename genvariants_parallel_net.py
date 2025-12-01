@@ -7,6 +7,8 @@ from typing import List, Optional, Dict
 from argparse import ArgumentParser
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import autopep8
+import textwrap
 
 def get_endpoints() -> Dict[str, str]:
     result = dict()
@@ -72,12 +74,26 @@ def infilling_prompt_starcoder(
     """
     return f'<fim_prefix>{pre}<fim_suffix>{suf}<fim_middle>'
 
-infilling_prompt = None
+import re
+
+def get_mutable_limit(text: str) -> int:
+    """
+    Find the line number where the first function ending with '_gen' is defined.
+    Returns the total number of lines if no such function is found.
+    """
+    lines = text.split('\n')
+    for i, line in enumerate(lines):
+        # Match 'def function_name_gen(' or 'def function_name_gen ('
+        # Updated to match __rtsp_gen__ style as well
+        if re.match(r'^\s*def\s+(?:__)?\w+_gen(?:__)?\s*\(', line):
+            return i
+    return len(lines)
 
 def continue_completion(text: str) -> tuple[str, str]:
     text_lines = text.split('\n')
-    # Pick a random line number to cut at
-    cut_line = len(text_lines)
+    limit = get_mutable_limit(text)
+    # Pick a random line number to cut at, respecting the limit
+    cut_line = limit if limit < len(text_lines) else len(text_lines)
     prompt_text = '\n'.join(text_lines[:cut_line])
     real_completion = ''
     return prompt_text, real_completion
@@ -86,20 +102,35 @@ def random_completion(text: str, start_line: int = 1) -> tuple[str,str]:
     """Generate a completion of the text starting from a random line.
     Always include at least 1 line to avoid an empty prompt."""
     text_lines = text.split('\n')
+    limit = get_mutable_limit(text)
+    
+    # Ensure we don't go past the limit
+    effective_len = min(len(text_lines), limit)
+    
     # Pick a random line number to cut at
-    cut_line = len(text_lines) - 2 if start_line + 1 >= len(text_lines) - 1 else random.randint(start_line + 1, len(text_lines) - 1)
+    cut_line = effective_len - 2 if start_line + 1 >= effective_len - 1 else random.randint(start_line + 1, effective_len - 1)
     prompt_text = '\n'.join(text_lines[:cut_line])
+    # The completion should ideally not include the protected part, but here we just return the rest of the file as "real_completion"
+    # However, for generation, we only care about the prompt.
+    # If we want to preserve the suffix (protected part), we should handle it in generate_variant
     real_completion = '\n'.join(text_lines[cut_line:])
     return prompt_text, real_completion
 
 def random_fim(text: str, start_line: int = 1) -> tuple[str,str,str]:
     """Fill in the middle of the text with a random completion."""
     text_lines = text.split('\n')
+    limit = get_mutable_limit(text)
+    
+    # Ensure we don't go past the limit
+    effective_len = min(len(text_lines), limit)
+    
     # Random start and end lines. Make sure we always have at least
     # one line in each section.
-    fim_start_line = len(text_lines) - 3 if start_line + 1 >= len(text_lines) - 2 else random.randint(start_line + 1, len(text_lines) - 2)
-    fim_end_line = random.randint(fim_start_line + 1, len(text_lines) - 1)
+    fim_start_line = effective_len - 3 if start_line + 1 >= effective_len - 2 else random.randint(start_line + 1, effective_len - 2)
+    fim_end_line = random.randint(fim_start_line + 1, effective_len - 1)
+    
     prefix_text = '\n'.join(text_lines[:fim_start_line]) + '\n'
+    # Suffix includes the rest of the mutable part AND the protected part
     suffix_text = '\n'.join(text_lines[fim_end_line:])
     real_middle = '\n'.join(text_lines[fim_start_line:fim_end_line])
     return prefix_text, suffix_text, real_middle
@@ -109,21 +140,28 @@ def random_crossover(text1: str, text2: str, start_line: int = 1) -> tuple[str,s
 
     text_lines1 = text1.split('\n')
     text_lines2 = text2.split('\n')
+    
+    limit1 = get_mutable_limit(text1)
+    limit2 = get_mutable_limit(text2)
+    
+    effective_len1 = min(len(text_lines1), limit1)
+    effective_len2 = min(len(text_lines2), limit2)
 
     common_prefix = 0
-    for i in range(min(len(text_lines1), len(text_lines2))):
+    for i in range(min(effective_len1, effective_len2)):
         if text_lines1[i] != text_lines2[i]:
             common_prefix = i - 1
             break
     
-    cut_line1 = len(text_lines1) - 2 if start_line + 1 >= len(text_lines1) -1 else random.randint(start_line + 1, len(text_lines1) - 1)
+    cut_line1 = effective_len1 - 2 if start_line + 1 >= effective_len1 -1 else random.randint(start_line + 1, effective_len1 - 1)
 
     may_overlap = min(cut_line1 - 1, common_prefix)
 
     cut_line2_start = max(may_overlap, start_line)
     
-    cut_line2 = len(text_lines2) - 2 if cut_line2_start + 1 >= len(text_lines2) - 1 else random.randint(cut_line2_start + 1, len(text_lines2) - 1)
+    cut_line2 = effective_len2 - 2 if cut_line2_start + 1 >= effective_len2 - 1 else random.randint(cut_line2_start + 1, effective_len2 - 1)
     prefix = '\n'.join(text_lines1[:cut_line1])
+    # Suffix includes the rest of text2, including any protected part
     suffix = '\n'.join(text_lines2[cut_line2:])
     return prefix, suffix
 
@@ -135,6 +173,85 @@ def random_crossover(text1: str, text2: str, start_line: int = 1) -> tuple[str,s
 #     parser_chunks = open(random.choice(SRCS)).read().split('\n\n')
 
 #     "# NOTE: the corresponding parser code in C is:\n#\n"
+
+def clean_markdown(text):
+    lines = text.split('\n')
+    if lines and lines[0].strip().startswith('```'):
+        lines = lines[1:]
+    if lines and lines[-1].strip().startswith('```'):
+        lines = lines[:-1]
+    return '\n'.join(lines)
+
+def fix_unclosed_strings(text):
+    quote_char = None
+    escaped = False
+    for char in text:
+        if escaped:
+            escaped = False
+            continue
+        if char == '\\':
+            escaped = True
+            continue
+        if quote_char:
+            if char == quote_char:
+                quote_char = None
+        else:
+            if char in '"\'':
+                quote_char = char
+    
+    if quote_char:
+        text += quote_char
+    return text
+
+def fix_indentation(prefix, text):
+    lines = text.split('\n')
+    if not lines:
+        return text
+        
+    prefix_lines = prefix.split('\n')
+    last_prefix_line = prefix_lines[-1] if prefix_lines else ""
+    
+    should_indent = last_prefix_line.strip().endswith(':')
+    
+    # Find first non-empty line to check indentation
+    first_non_empty_idx = -1
+    for i, line in enumerate(lines):
+        if line.strip():
+            first_non_empty_idx = i
+            break
+            
+    if first_non_empty_idx == -1:
+        return text
+        
+    first_line = lines[first_non_empty_idx]
+    first_line_indent = len(first_line) - len(first_line.lstrip())
+    
+    if should_indent and first_line_indent == 0:
+        return '\n'.join(['    ' + line for line in lines])
+    elif not should_indent and first_line_indent > 0:
+        return textwrap.dedent(text)
+        
+    return text
+
+def check_and_fix_balance(text):
+    stack = []
+    mapping = {')': '(', ']': '[', '}': '{'}
+    reverse_mapping = {'(': ')', '[': ']', '{': '}'}
+    
+    for char in text:
+        if char in '([{':
+            stack.append(char)
+        elif char in ')]}':
+            if stack and stack[-1] == mapping[char]:
+                stack.pop()
+            else:
+                pass 
+    
+    suffix = ""
+    while stack:
+        opener = stack.pop()
+        suffix += reverse_mapping[opener]
+    return text + suffix
 
 def new_base(filename: str) -> tuple[str, str]:
     # filename and extension
@@ -151,8 +268,25 @@ def new_base(filename: str) -> tuple[str, str]:
 def generate_variant(i, generators, model, filename, args):
     # Pick a random generator
     generator = random.choice(generators)
+
+    instruction = ""
+    # args is actually the config object parsed by ELMFuzzConfig, so it contains all config options
+    # protocol_type is a global option, so it should be directly accessible
+    if hasattr(args, 'protocol_type') and args.protocol_type != 'none':
+        instruction = (
+            f"# Context: This is a polished seed file for generating network protocol fuzzing packets for {args.protocol_type}.\n"
+            f"# Goal: Analyze the existing {args.protocol_type} protocol request fuzzing functions in the seed file.\n"
+            f"# Task: Generate similar protocol fuzzing functions for the {args.protocol_type} protocol.\n"
+            f"# Requirements:\n"
+            f"# 1. Maintain the same structure, return type, and protocol format.\n"
+            f"# 2. Generate diverse requests to cover different protocol states and edge cases.\n"
+            f"# 3. Ensure the generated code is syntactically correct Python.\n"
+        )
+
     if generator == 'infilled':
         prefix, suffix, orig = random_fim(open(filename).read(), args.start_line)
+        if instruction:
+            prefix = instruction + prefix
         prompt = infilling_prompt(prefix, suffix) # type: ignore
         stop = []
     elif generator == 'lmsplice':
@@ -163,6 +297,8 @@ def generate_variant(i, generators, model, filename, args):
             filename2 = filename
         prefix, suffix = random_crossover(open(filename).read(), open(filename2).read(), args.start_line)
         orig = ''
+        if instruction:
+            prefix = instruction + prefix
         prompt = infilling_prompt(prefix, suffix) # type: ignore
         stop = []
     elif generator == 'continue':
@@ -174,7 +310,17 @@ def generate_variant(i, generators, model, filename, args):
     else:
         assert generator == 'complete'
         prefix, orig = random_completion(open(filename).read(), args.start_line)
-        suffix = ''
+        # For 'complete', we need to append the protected suffix if it exists
+        text_content = open(filename).read()
+        limit = get_mutable_limit(text_content)
+        text_lines = text_content.split('\n')
+        if limit < len(text_lines):
+            suffix = '\n'.join(text_lines[limit:])
+        else:
+            suffix = ''
+        
+        if instruction:
+            prefix = instruction + prefix
         prompt = prefix
         stop = ['\nif', '\nclass', '\nfor', '\nwhile']
 
@@ -229,6 +375,18 @@ def generate_variant(i, generators, model, filename, args):
         for stop_seq in stop:
             if text.endswith(stop_seq):
                 text = text[:-len(stop_seq)]
+    
+    # Apply new fixes
+    text = clean_markdown(text)
+    text = fix_indentation(prefix, text)
+    text = fix_unclosed_strings(text)
+    
+    # Check balance on prefix + text
+    full_text = prefix + text
+    balanced_full_text = check_and_fix_balance(full_text)
+    added_suffix = balanced_full_text[len(full_text):]
+    text += added_suffix
+    
     gen_lines = text.count('\n')
 
     # one of [length, eos_token, stop_sequence]
@@ -250,11 +408,25 @@ def generate_variant(i, generators, model, filename, args):
         'base': [base] + ([base2] if generator == 'lmsplice' else []),
         'response': res,
     }
+    
+    mutable_content = prefix + text
+    try:
+        mutable_content = autopep8.fix_code(mutable_content)
+    except Exception:
+        pass
+
+    # Ensure separation if suffix exists
+    if suffix and not mutable_content.endswith('\n\n'):
+        if mutable_content.endswith('\n'):
+            mutable_content += '\n'
+        else:
+            mutable_content += '\n\n'
+
+    full_content = mutable_content + suffix
+
     # Write output to file
     with open(out_path, 'w') as f:
-        f.write(prefix)
-        f.write(text)
-        f.write(suffix)
+        f.write(full_content)
 
     # Write metadata to logdir
     with open(meta_file, 'w') as f:
@@ -336,11 +508,11 @@ def main():
     forbidden = [f.strip() for f in forbidden if f.strip()]
 
     generators = []
-    if not args.no_completion or 'complete' not in forbidden:
+    if not args.no_completion and 'complete' not in forbidden:
         generators += ['complete']
-    if not args.no_fim or 'infilled' not in forbidden:
+    if not args.no_fim and 'infilled' not in forbidden:
         generators += ['infilled']
-    if not args.no_splice or 'lmsplice' not in forbidden:
+    if not args.no_splice and 'lmsplice' not in forbidden:
         generators += ['lmsplice']
     # generators += ['continue']
 

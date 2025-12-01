@@ -116,8 +116,7 @@ def synthesize(target, benchmark, tgi_waiting, evolution_iterations, use_small_m
 
 @cli.command(name="tdnet", help="Synthesize input generators for network protocols.")
 @click.option("--target", "-T", required=True, type=click.Choice(
-    ["fuzzer.elfuzz", "fuzzer.elfuzz_nofs", "fuzzer.elfuzz_nocp", "fuzzer.elfuzz_noin", "fuzzer.elfuzz_nosp",
-     "grammar.glade", "semantics.islearn"]
+    ["tdpfuzzer.tdpfuzzer", "tdpfuzzer.tdpfuzzer_noss", "tdpfuzzer.tdpfuzzer_nosm"]
 ))
 @click.argument("benchmark", required=True, type=click.Choice(
     ["live555"]

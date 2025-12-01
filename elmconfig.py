@@ -305,6 +305,7 @@ class ELMFuzzConfig:
         group.add_argument('--project_name', type=str)
         group.add_argument('--fuzzbench_project', type=str, default='')
         group.add_argument('--oss_fuzz_project', type=str, default='')
+        group.add_argument('--protocol_type', type=str, default='none')
         self.subgroup_help['target'] = 'Options to configure the target program being fuzzed'
         group.add_argument("--target.srcs", type=Path, nargs='+', action='extend',
                            help="Source files in the target")
