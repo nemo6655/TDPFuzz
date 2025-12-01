@@ -339,6 +339,8 @@ class ELMFuzzConfig:
                             help="Directory (template) to store logs")
         group.add_argument("--run.clean", action='store_true',
                             help="Clean the output directories before running")
+        group.add_argument("--run.state_pools", type=str, nargs='+', default=['0001', '0002'],
+                           help="List of state pools")
 
         # XXX: For testing only
         # group = self.parser.add_argument_group('Test options', 'Lorem ipsum dolor sit amet')

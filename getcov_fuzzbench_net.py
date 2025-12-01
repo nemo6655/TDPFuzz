@@ -9,6 +9,7 @@ import re
 import tarfile
 from util import *
 import logging
+import json
 from idontwannadoresearch import MailLogger, watch
 
 logger = logging.getLogger(__file__)
@@ -68,6 +69,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
         os.makedirs(target_dir, exist_ok=True)
         # Build worklist: if input dir has subdirectories, treat each subdir as a separate job
         worklist = []
+        use_0000 = False
         if os.path.isdir(input):
             # find subdirectories
             entries = [os.path.join(input, name) for name in os.listdir(input)]
@@ -77,6 +79,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
             else:
                 # no subdirs: use the whole input dir as single job
                 worklist = [input]
+                use_0000 = True
         else:
             # single file provided
             worklist = [input]
@@ -135,6 +138,8 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
             if cids:
                 subprocess.run(['docker', 'wait'] + cids, check=True)
 
+            all_cov_data = {str(next_gen): {}}
+
             # Collect outputs from each container
             for cid in cids:
                 run_tmp, output_base = runmap.get(cid)
@@ -150,41 +155,79 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                 if os.path.exists(aflout_path):
                     try:
                         safe_job = output_base[len('aflnetout_'):] if output_base.startswith('aflnetout_') else output_base
+                        if use_0000:
+                            safe_job = '0000'
                         extract_root = os.path.join(dest_dir, safe_job)
                         os.makedirs(extract_root, exist_ok=True)
                         with tarfile.open(aflout_path, 'r:*') as tf:
                             for member in tf.getmembers():
-                                # normalize member name and find the 'queue' component
+                                # normalize member name
                                 name = member.name.lstrip('./')
                                 parts = name.split('/')
-                                if 'queue' not in parts:
-                                    continue
-                                qi = parts.index('queue')
-                                rel_parts = parts[qi+1:]
-                                if not rel_parts:
-                                    continue
-                                relpath = os.path.join(*rel_parts)
-                                target_path = os.path.join(extract_root, relpath)
-                                # create directories as needed
-                                parent = os.path.dirname(target_path)
-                                if parent:
-                                    os.makedirs(parent, exist_ok=True)
-                                if member.isdir():
-                                    os.makedirs(target_path, exist_ok=True)
-                                else:
-                                    f = tf.extractfile(member)
-                                    if f is None:
+                                
+                                target_path = None
+                                if '.state' in parts and 'seed_cov' in parts:
+                                    si = parts.index('seed_cov')
+                                    rel_parts = parts[si+1:]
+                                    if rel_parts:
+                                        target_path = os.path.join(extract_root, 'seed_cov', *rel_parts)
+                                elif 'queue' in parts:
+                                    if '.state' in parts:
                                         continue
-                                    with open(target_path, 'wb') as out_f:
-                                        shutil.copyfileobj(f, out_f)
-                    except Exception as e:
-                        print(f"Warning: failed to extract queue files from {aflout_path}: {e}")
+                                    qi = parts.index('queue')
+                                    rel_parts = parts[qi+1:]
+                                    if rel_parts:
+                                        target_path = os.path.join(extract_root, *rel_parts)
+                                
+                                if target_path:
+                                    # create directories as needed
+                                    parent = os.path.dirname(target_path)
+                                    if parent:
+                                        os.makedirs(parent, exist_ok=True)
+                                    if member.isdir():
+                                        os.makedirs(target_path, exist_ok=True)
+                                    else:
+                                        f = tf.extractfile(member)
+                                        if f is None:
+                                            continue
+                                        with open(target_path, 'wb') as out_f:
+                                            shutil.copyfileobj(f, out_f)
+                        
+                        # Process coverage files
+                        seed_cov_dir = os.path.join(extract_root, 'seed_cov')
+                        job_cov = {}
+                        if os.path.exists(seed_cov_dir):
+                            for cov_file in os.listdir(seed_cov_dir):
+                                cov_path = os.path.join(seed_cov_dir, cov_file)
+                                if os.path.isfile(cov_path):
+                                    with open(cov_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                        content = [line.strip() for line in f if line.strip()]
+                                    job_cov[cov_file] = content
+                        
+                        # Save per-job json
+                        with open(os.path.join(dest_dir, f'cov_{safe_job}.json'), 'w') as f:
+                            json.dump(job_cov, f)
+                        
+                        if safe_job not in all_cov_data[str(next_gen)]:
+                            all_cov_data[str(next_gen)][safe_job] = {}
 
+                        for k, v in job_cov.items():
+                            edges_only = [item.split(':')[0] for item in v]
+                            all_cov_data[str(next_gen)][safe_job][k] = edges_only
+
+                    except Exception as e:
+                        print(f"Warning: failed to extract/process files from {aflout_path}: {e}")
+                
                 # copy cov if present in bound dir
                 host_cov = os.path.join(run_tmp, 'cov')
                 if os.path.exists(host_cov):
                     out_cov = covfile if len(cids) == 1 else f"{covfile.rstrip('.json')}_{cid[:12]}.json"
                     shutil.copy(host_cov, out_cov)
+            
+            # Write aggregated coverage to covfile
+            if all_cov_data:
+                with open(covfile, 'w') as f:
+                    json.dump(all_cov_data, f)
         else:
             # Apptainer/sif path: run serially for the combined input
             cmd = [
@@ -195,17 +238,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                 '/usr/bin/bash', '-c', f'python3 /src/elm_getcov_inside_docker.py --input {target_dir} --output /tmp/out -j {parallel_num} --prog="{covbin_str}" --real-feedback {real_feedback} --afl-timeout={afl_timeout}'
             ]
             subprocess.run(cmd, check=True, stdout=sys.stdout, stderr=sys.stderr)
-        
-        
-            
-        if os.path.exists(os.path.join(tmpdir, 'cov')):
-            shutil.copy(f'{tmpdir}/cov', covfile)
-        else:
-            print(f"Warning: cov file not found in {tmpdir}; skipping copy to {covfile}")
-        
-        
-        
-        
+
     if os.path.exists(tmpdir):
         shutil.rmtree(tmpdir, ignore_errors=True)
 

@@ -96,7 +96,19 @@ if [ $start_gen -eq -1 ]; then
     # Stamp dir tells us when a generation is fully finished
     # In the future this will let us resume a run
     mkdir -p "$ELMFUZZ_RUNDIR"/stamps
-    cp -v $seeds "$ELMFUZZ_RUNDIR"/initial/seeds/
+    mkdir -p "$ELMFUZZ_RUNDIR"/initial/seeds/0000
+    mkdir -p "$ELMFUZZ_RUNDIR"/initial/variants/0000
+
+    IFS=$' \t\n' read -r -a SEED_ARR <<< "$seeds"
+    for s in "${SEED_ARR[@]}"; do
+    if [ -e "$s" ]; then
+        cp -- "$s" "$ELMFUZZ_RUNDIR/initial/seeds/0000/"
+    else
+        echo "Warning: seed not found: $s" >&2
+    fi
+    done
+
+
     ./do_gen_net.sh initial gen0
     for i in $(seq 0 $last_gen); do
         ./do_gen_net.sh gen$i gen$((i+1))

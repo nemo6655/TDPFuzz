@@ -246,3 +246,20 @@ index 8023451..5d93f71 100644
    /* Sync directory for keeping track of cooperating fuzzers. */
  
    if (sync_id) {
+diff --git a/aflnet.c b/aflnet.c
+index c286d96..eb7a04b 100644
+--- a/aflnet.c
++++ b/aflnet.c
+@@ -1692,6 +1692,12 @@ u8* state_sequence_to_string(unsigned int *stateSequence, unsigned int stateCoun
+       break;
+     }
+   }
++
++  // Remove trailing hyphen if it exists (can happen if the last few states were skipped)
++  if (out && len > 0 && out[len - 1] == '-') {
++    out[len - 1] = '\0';
++  }
++
+   return out;
+ }
+ 

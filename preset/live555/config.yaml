@@ -29,23 +29,33 @@ model:
 run:
   # Seed files (generator programs that will be mutated) (default: None)
   seeds:
-  - /home/appuser/elmfuzz/preset/live555/seed_genjson.py
+  - /home/appuser/elmfuzz/preset/live555/init_seeds/*.raw
   # Number of generations to run (default: 10)
-  num_generations: 50
+  num_generations: 5
   # Selection strategy (one of: elites, best_of_generation) (default: elites)
   selection_strategy: lattice
   # Number of seeds to select each generation (default: 10)
   num_selected: 10
   # Directory (template) to store generated variants (default:
   # {ELMFUZZ_RUNDIR}/{GEN}/variants/{MODEL})
-  genvariant_dir: '{ELMFUZZ_RUNDIR}/{GEN}/variants/{MODEL}'
+  genvariant_dir: '{ELMFUZZ_RUNDIR}/{GEN}/variants/'
   # Directory (template) to store generated outputs (default:
   # {ELMFUZZ_RUNDIR}/{GEN}/outputs/{MODEL})
-  genoutput_dir: '/home/appuser/fastdata/randompngs/{ELMFUZZ_RUN_NAME}/{GEN}/{MODEL}'
+  genoutput_dir: '{ELMFUZZ_RUNDIR}/{GEN}/seeds/'
   # Directory (template) to store logs (default: {ELMFUZZ_RUNDIR}/{GEN}/logs)
   logdir: '{ELMFUZZ_RUNDIR}/{GEN}/logs'
   # Clean the output directories before running (default: False)
   clean: true
+
+  state_pools:
+  - '0000'
+  - '0001'
+  - '0002'
+  - '0003'
+  - '0004'
+  - '0005'
+  - '0006'
+  - '0007'
 
 # ------------------------- Specific CLI utility options -------------------------
 
@@ -61,7 +71,7 @@ cli:
     # Disable the splice mutator (default: False)
     no_splice: false
     # Number of variants to generate for each seed (default: 1)
-    num_variants: 20
+    num_variants: 5
     # Directory to write variants to (default: .)
     output_dir: .
     # Directory to write generation metadata to (default: logs)
@@ -97,7 +107,7 @@ cli:
       output_suffix: .raw
       # Number of times to run each function in each module (i.e., number of
       # outputs to generate) (default: 100)
-      num_iterations: 1000
+      num_iterations: 1
       # real_feedback: false
   getcov:
     # Output file where coverage will be written (default: output.json)

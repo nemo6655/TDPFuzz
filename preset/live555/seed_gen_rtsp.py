@@ -1,6 +1,8 @@
 import os
 import glob
 import re
+import argparse
+import sys
 
 def get_rtsp_method(payload):
     try:
@@ -13,12 +15,15 @@ def get_rtsp_method(payload):
         pass
     return "UNKNOWN"
 
-def generate_files():
-    seeds_dir = "seeds"
-    output_dir = "initial/variants"
-    
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+def generate_files(seeds_dir, output_dir):
+    try:
+        if not os.path.exists(seeds_dir):
+            os.makedirs(seeds_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+    except OSError as e:
+        print(f"Error creating directories: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Ensure we process files in a deterministic order
     raw_files = sorted(glob.glob(os.path.join(seeds_dir, "*.raw")))
@@ -116,4 +121,8 @@ def generate_files():
     print(f"Generated {rtsp_all_path}")
 
 if __name__ == "__main__":
-    generate_files()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_seeds', default='seeds', help='Input seeds directory')
+    parser.add_argument('--init_variants', default='initial/variants', help='Output python file directory')
+    args = parser.parse_args()
+    generate_files(args.input_seeds, args.init_variants)
