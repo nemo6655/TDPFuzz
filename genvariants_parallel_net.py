@@ -473,7 +473,7 @@ def main():
     global infilling_prompt
     import sys
     from elmconfig import ELMFuzzConfig
-    config = ELMFuzzConfig(parents={'genvariants_parallel': make_parser()})
+    config = ELMFuzzConfig(prog='genvariants_parallel', parents={'genvariants_parallel': make_parser()})
     init_parser(config)
     args = config.parse_args()
 

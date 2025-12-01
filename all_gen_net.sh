@@ -99,16 +99,11 @@ if [ $start_gen -eq -1 ]; then
     mkdir -p "$ELMFUZZ_RUNDIR"/initial/seeds/0000
     mkdir -p "$ELMFUZZ_RUNDIR"/initial/variants/0000
 
-    IFS=$' \t\n' read -r -a SEED_ARR <<< "$seeds"
-    for s in "${SEED_ARR[@]}"; do
-    if [ -e "$s" ]; then
-        cp -- "$s" "$ELMFUZZ_RUNDIR/initial/seeds/0000/"
-    else
-        echo "Warning: seed not found: $s" >&2
-    fi
-    done
-
-
+    cp -r $seeds "${ELMFUZZ_RUNDIR}/initial/seeds/0000/"
+    PROTOCOL_TYPE=$(./elmconfig.py get protocol_type)
+    python "$ELMFUZZ_RUNDIR"/seed_gen_${PROTOCOL_TYPE}.py \
+        --input_seeds "$ELMFUZZ_RUNDIR"/initial/seeds/0000/ \
+        --init_variants "$ELMFUZZ_RUNDIR"/initial/variants/0000/ 
     ./do_gen_net.sh initial gen0
     for i in $(seq 0 $last_gen); do
         ./do_gen_net.sh gen$i gen$((i+1))

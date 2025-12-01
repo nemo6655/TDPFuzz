@@ -173,7 +173,7 @@ done
 echo "Collecting coverage of the generators"
 all_models_genout_dir=$(realpath -m "$GOOUT")
 
-if [ $TYPE == "fuzzbench" ] || [ $TYPE == "oss-fuzz" ] || [ $TYPE == "docker" || [ $TYPE == "profuzzbench" ] ]; then
+if [ $TYPE == "fuzzbench" ] || [ $TYPE == "oss-fuzz" ] || [ $TYPE == "docker"] || [ $TYPE == "profuzzbench" ]; then
     python getcov_fuzzbench_net.py --image tdpfuzz/"$PROJECT_NAME" --input "$all_models_genout_dir" --output "${AFLNET_OUT}" --covfile "${LOGDIR}/coverage.json" --next_gen "${next_gen#gen}"
 else
     python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
