@@ -26,7 +26,9 @@ def generate_files(seeds_dir, output_dir):
         sys.exit(1)
 
     # Ensure we process files in a deterministic order
-    raw_files = sorted(glob.glob(os.path.join(seeds_dir, "*.raw")))
+    # Collect all files (filenames only) under the seeds_dir
+    all_entries = sorted(glob.glob(os.path.join(seeds_dir, "*")))
+    raw_files = [os.path.basename(p) for p in all_entries if os.path.isfile(p)]
     
     all_funcs_code_for_all_py = []
     all_funcs_names_for_all_py = []
@@ -55,10 +57,11 @@ def generate_files(seeds_dir, output_dir):
     rtsp_gen_code += "    except Exception:\n"
     rtsp_gen_code += "        pass\n"
 
-    for file_idx, raw_file in enumerate(raw_files):
-        filename = os.path.basename(raw_file)
+    for file_idx, raw_name in enumerate(raw_files):
+        filename = raw_name
         file_stem = os.path.splitext(filename)[0]
-        
+        raw_file = os.path.join(seeds_dir, filename)
+
         with open(raw_file, "rb") as f:
             content = f.read()
         

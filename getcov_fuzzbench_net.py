@@ -114,7 +114,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                     'docker', 'run', '-d', '--cpus=1',
                     '-v', f'{run_tmp}:/tmp',
                     image,
-                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {next_gen * 600} 5'
+                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 5'
                 ]
                 # start and return container id and run_tmp
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)

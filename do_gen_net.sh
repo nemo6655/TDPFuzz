@@ -5,6 +5,14 @@ set -euo pipefail
 
 prev_gen="$1"
 next_gen="$2"
+# Compute prev_prev_gen: if prev_gen is of form gen<N>, set prev_prev_gen=gen<N-1>
+prev_prev_gen=""
+if [[ "$prev_gen" =~ ^gen([0-9]+)$ ]]; then
+    prev_num=${BASH_REMATCH[1]}
+    prev_prev_num=$((prev_num - 1))
+    prev_prev_gen="gen${prev_prev_num}"
+fi
+
 num_gens=$(./elmconfig.py get run.num_generations)
 
 # MODELS="codellama starcoder starcoder_diff"
@@ -20,21 +28,6 @@ COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
 COLOR_RESET='\033[0m'
 
-# Discover existing state directories under the previous generation's seeds
-# and store their basenames into the STATE array.
-STATE=()
-prev_seeds_dir="$ELMFUZZ_RUNDIR/${prev_gen}/seeds"
-if [ -d "$prev_seeds_dir" ]; then
-    while IFS= read -r -d '' dir; do
-        STATE+=("$(basename "$dir")")
-    done < <(find "$prev_seeds_dir" -mindepth 1 -maxdepth 1 -type d -print0)
-fi
-echo "Discovered state directories from ${prev_gen}: ${STATE[*]}"
-# If no state directories were found, exit with error
-if [ ${#STATE[@]} -eq 0 ]; then
-    echo "Error: no state directories found under ${prev_seeds_dir}; aborting." >&2
-    exit 1
-fi
 
 
 printf "$COLOR_GREEN"'============> %s: %6s -> %6s of %3d <============'"$COLOR_RESET"'\n' $ELMFUZZ_RUN_NAME $prev_gen $next_gen $num_gens
@@ -59,7 +52,7 @@ seed_num=1
 # If this is the first generation, just use the seed
 if [ "$prev_gen" == "initial" ]; then
     echo "First generation; using seed(s):" "$ELMFUZZ_RUNDIR"/init_seeds/*.raw
-    
+    STATE_POOLS=('0000')
     # cp "$ELMFUZZ_RUNDIR"/initial/seeds/*.py "$ELMFUZZ_RUNDIR"/${next_gen}/seeds/
 else
     # Selection
@@ -85,10 +78,16 @@ else
         exit 1
     fi
     if [ "$selection_strategy" == "lattice" ]; then
+
+        if [[ "${prev_gen}" == "gen0" ]]; then
+            prev_prev_gen="$prev_gen"
+        fi
+
         cov_file="$ELMFUZZ_RUNDIR"/${prev_gen}/logs/coverage.json
-        input_elite_file="$ELMFUZZ_RUNDIR"/${prev_gen}/logs/elites.json
-        output_elite_file="$ELMFUZZ_RUNDIR"/${next_gen}/logs/elites.json
+        input_elite_file="$ELMFUZZ_RUNDIR"/${prev_prev_gen}/logs/elites.json
+        output_elite_file="$ELMFUZZ_RUNDIR"/${prev_gen}/logs/elites.json
         # Ensure the input elites file exists (create empty file if missing)
+
         if [ ! -f "$input_elite_file" ]; then
             mkdir -p "$(dirname "$input_elite_file")"
             : > "$input_elite_file"
@@ -100,8 +99,12 @@ else
         #         cp "$ELMFUZZ_RUNDIR"/${gen}/variants/${model}/${generator}.py \
         #         "$ELMFUZZ_RUNDIR"/${next_gen}/seeds/${gen}_${model}_${generator}.py
         #     done
+
+        
+
         python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
-        python select_states_net.py -c $cov_file -e $output_elite_file -g $next_gen
+       
+        python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen
         # python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file | \
         #     while read cov gen model generator ; do
         #         echo "Selecting $generator from $gen/$model with $cov edges covered"
@@ -141,7 +144,7 @@ echo "Generating next generation: ${NUM_VARIANTS} variants for each seed with ea
 
 
 for model_name in $MODELS ; do
-    for state_name in "${STATE[@]}"; do
+    for state_name in "${STATE_POOLS[@]}"; do
         MODEL=$(basename "$model_name")
         GVLOG="${LOGDIR}/meta"
         GOLOG="${LOGDIR}/outputgen_${MODEL}.jsonl"
@@ -173,7 +176,7 @@ done
 echo "Collecting coverage of the generators"
 all_models_genout_dir=$(realpath -m "$GOOUT")
 
-if [ $TYPE == "fuzzbench" ] || [ $TYPE == "oss-fuzz" ] || [ $TYPE == "docker"] || [ $TYPE == "profuzzbench" ]; then
+if [[ "$TYPE" == "fuzzbench" || "$TYPE" == "oss-fuzz" || "$TYPE" == "docker" || "$TYPE" == "profuzzbench" ]]; then
     python getcov_fuzzbench_net.py --image tdpfuzz/"$PROJECT_NAME" --input "$all_models_genout_dir" --output "${AFLNET_OUT}" --covfile "${LOGDIR}/coverage.json" --next_gen "${next_gen#gen}"
 else
     python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
