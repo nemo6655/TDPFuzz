@@ -1,0 +1,29 @@
+services:
+  elfuzz:
+    # 镜像名称（与原命令一致）
+    image: ghcr.io/osuseclab/elfuzz:25.08.0
+    # 容器名称（与原--name一致）
+    container_name: elfuzz
+    # 交互式终端（对应-it的tty和stdin_open）
+    tty: true
+    stdin_open: true
+    # CPU核心限制（对应--cpus 30）
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+    # 存储大小限制（对应--storage-opt size=100G）
+#    storage_opt:
+#      size: 100G
+    # 主机映射（对应--add-host=host.docker.internal:host-gateway）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 数据卷挂载（对应-v参数）
+    volumes:
+      - /tmp/host:/tmp/host
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/test/TDPFuzz:/home/appuser/elmfuzz
+    # 可选：添加网络模式（若需要和宿主机网络互通）
+    # network_mode: host
+    # 可选：容器退出后自动重启（根据需求添加）
+    # restart: unless-stopped
