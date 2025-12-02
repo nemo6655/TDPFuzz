@@ -24,6 +24,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/test/TDPFuzz:/home/appuser/elmfuzz
     # 可选：添加网络模式（若需要和宿主机网络互通）
-    # network_mode: host
+    network_mode: host
     # 可选：容器退出后自动重启（根据需求添加）
-    # restart: unless-stopped
+    restart: unless-stopped
