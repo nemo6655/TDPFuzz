@@ -26,6 +26,20 @@ def generate_completion(
         temperature=0.2,
         max_new_tokens=1200,
         repetition_penalty=1.1,
+        stop=None, model_name=None
+):
+    """Generate a completion of the prompt."""
+    if model_name and model_name.startswith('glm'):
+        return generate_completion_glm(prompt, temperature, max_new_tokens, repetition_penalty, stop)
+    else:
+        return generate_completion_tgi(prompt, temperature, max_new_tokens, repetition_penalty, stop)
+
+
+def generate_completion_tgi(
+        prompt,
+        temperature=0.2,
+        max_new_tokens=1200,
+        repetition_penalty=1.1,
         stop=None,
 ):
     """Generate a completion of the prompt."""
@@ -42,6 +56,57 @@ def generate_completion(
     if stop is not None:
         data['parameters']['stop'] = stop
     return requests.post(f'{ENDPOINT}/generate', json=data).json()
+
+def generate_completion_glm(
+        prompt,
+        temperature=0.2,
+        max_new_tokens=1200,
+        repetition_penalty=1.1,
+        stop=None
+):
+    """Generate a completion of the prompt using GLM API."""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.getenv('GLM_API_KEY', 'ebe3a97c24334436ba087f3cc7e1e75c.g46A8qOGoi2o5F6P')}"
+    }
+
+    # 使用传入的模型名，如果没有则从全局变量获取，最后使用默认值
+    model_name = globals().get('model', 'glm-4.5-flash')
+
+    data = {
+        "model": model_name,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": max_new_tokens,
+    }
+
+    if stop is not None:
+        data["stop"] = stop
+
+    response = requests.post(
+        ENDPOINT,
+        headers=headers,
+        json=data,
+        timeout=30
+    )
+
+    if response.status_code == 200:
+        result = response.json()
+        # 转换为与TGI兼容的格式
+        if "choices" in result and len(result["choices"]) > 0:
+            return {
+                "generated_text": result["choices"][0]["message"]["content"],
+                "details": {
+                    "finish_reason": result["choices"][0].get("finish_reason", "unknown")
+                }
+            }
+
+    # 如果出错，返回错误信息
+    return {
+        "error": f"GLM API error: {response.status_code} - {response.text}"
+    }
 
 def infilling_prompt_llama(
     pre: str,
@@ -71,6 +136,15 @@ def infilling_prompt_starcoder(
     If `suffix_first` is set, format in suffix-prefix-middle format.
     """
     return f'<fim_prefix>{pre}<fim_suffix>{suf}<fim_middle>'
+
+def infilling_prompt_glm(
+    pre: str,
+    suf: str,
+) -> str:
+    """
+    Format an infilling problem for GLM.
+    """
+    return f'<|fim_prefix|>{pre}<|fim_suffix|>{suf}<|fim_middle|>'
 
 infilling_prompt = None
 
@@ -323,6 +397,8 @@ def main():
         infilling_prompt = infilling_prompt_llama
     elif model.startswith('Qwen/Qwen2.5-Coder'):
         infilling_prompt = infilling_prompt_qwen
+    elif model.startswith('glm-'):
+        infilling_prompt = infilling_prompt_glm
 
     if infilling_prompt is None and not args.no_fim:
         config.parser.error(f'Model {model} does not support FIM')
