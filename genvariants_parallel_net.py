@@ -3,6 +3,7 @@
 import json
 import random
 import os
+import sys
 from typing import List, Optional, Dict
 from argparse import ArgumentParser
 import requests
@@ -48,12 +49,15 @@ def generate_completion(
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Request failed: {e}", file=sys.stderr)
-        return {}
+        error_res = {"error": f"Request failed: {e}"}
+        if e.response is not None:
+            error_res["response_text"] = e.response.text
+        return error_res
     except requests.exceptions.JSONDecodeError as e:
-        print(f"JSON decode error: {e}", file=sys.stderr)
-        print(f"Response text: {response.text}", file=sys.stderr)
-        return {}
+        return {
+            "error": f"JSON decode error: {e}",
+            "response_text": response.text
+        }
 
 def infilling_prompt_llama(
     pre: str,
@@ -481,7 +485,6 @@ def init_parser(elm):
 def main():
     global ENDPOINT
     global infilling_prompt
-    import sys
     from elmconfig import ELMFuzzConfig
     config = ELMFuzzConfig(prog='genvariants_parallel', parents={'genvariants_parallel': make_parser()})
     init_parser(config)

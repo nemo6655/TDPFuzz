@@ -66,6 +66,8 @@ def draw_success_rate(stats, preferred_colors=None):
         return f"{color}{BOX*width}{COLOR_END}"
 
     total = sum(stats.values())
+    if total == 0:
+        return ""
     outcome_bars = []
     legends = []
     color_index = 0

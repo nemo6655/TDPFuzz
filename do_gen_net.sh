@@ -102,7 +102,7 @@ else
 
         
 
-        python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
+        python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
        
         python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen
         # python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file | \
@@ -177,11 +177,19 @@ done
 echo "Collecting coverage of the generators"
 all_models_genout_dir=$(realpath -m "$GOOUT")
 
-if [[ "$TYPE" == "fuzzbench" || "$TYPE" == "oss-fuzz" || "$TYPE" == "docker" || "$TYPE" == "profuzzbench" ]]; then
-    python getcov_fuzzbench_net.py --image tdpfuzz/"$PROJECT_NAME" --input "$all_models_genout_dir" --output "${AFLNET_OUT}" --covfile "${LOGDIR}/coverage.json" --next_gen "${next_gen#gen}"
-else
-    python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
-fi
+case "$TYPE" in
+    fuzzbench|oss-fuzz|docker|profuzzbench)
+        python getcov_fuzzbench_net.py \
+            --image tdpfuzz/"$PROJECT_NAME" \
+            --input "$all_models_genout_dir" \
+            --output "${AFLNET_OUT}" \
+            --covfile "${LOGDIR}/coverage.json" \
+            --next_gen "${next_gen#gen}"
+        ;;
+    *)
+        python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
+        ;;
+esac
 
 
 # for model_name in $MODELS ; do

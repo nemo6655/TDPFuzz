@@ -210,7 +210,10 @@ def main(cov_file, elites_file, gen):
     # 3. Distribute to other pools
     state_pools = get_state_pools()
     # Filter out 0000 and 0001
-    target_pools = [p for p in state_pools if p not in ['0000', '0001']]
+    if missing_seeds_copied > 0:
+        target_pools = [p for p in state_pools if p not in ['0000', '0001']]
+    else:
+        target_pools = [p for p in state_pools if p not in ['0000']]
     
     distribution_results = {}
 
