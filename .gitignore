@@ -47,6 +47,8 @@ plot/table/*
 /extradata/*
 !/extradata/.gitkeep
 
+test_*
+
 # New folders
 analysis/rq1/
 analysis/rq2/

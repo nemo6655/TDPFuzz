@@ -16,8 +16,11 @@ def print_cov(covfiles):
         with open(covfile, 'r') as f:
             cov = json.load(f)
         for model, generators in cov.items():
-            for generator, cov in generators.items():
-                data.append((gen, model, generator, len(cov)))
+            for generator, seeds in generators.items():
+                edges = set()
+                for seed_edges in seeds.values():
+                    edges.update(seed_edges)
+                data.append((gen, model, generator, len(edges)))
     return data
 
 def cumulative_cov(covfiles):

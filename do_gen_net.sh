@@ -6,12 +6,7 @@ set -euo pipefail
 prev_gen="$1"
 next_gen="$2"
 # Compute prev_prev_gen: if prev_gen is of form gen<N>, set prev_prev_gen=gen<N-1>
-prev_prev_gen=""
-if [[ "$prev_gen" =~ ^gen([0-9]+)$ ]]; then
-    prev_num=${BASH_REMATCH[1]}
-    prev_prev_num=$((prev_num - 1))
-    prev_prev_gen="gen${prev_prev_num}"
-fi
+
 
 num_gens=$(./elmconfig.py get run.num_generations)
 
@@ -81,11 +76,16 @@ else
 
         if [[ "${prev_gen}" == "gen0" ]]; then
             prev_prev_gen="$prev_gen"
+        else
+            prev_num=${prev_gen#gen}
+            prev_prev_gen="gen$((prev_num - 1))"
         fi
+        echo "Using prev_prev_gen: $prev_prev_gen"
 
-        cov_file="$ELMFUZZ_RUNDIR"/${prev_gen}/logs/coverage.json
-        input_elite_file="$ELMFUZZ_RUNDIR"/${prev_prev_gen}/logs/elites.json
-        output_elite_file="$ELMFUZZ_RUNDIR"/${prev_gen}/logs/elites.json
+        
+        cov_file="${ELMFUZZ_RUNDIR}/${prev_gen}/logs/coverage.json"
+        input_elite_file="${ELMFUZZ_RUNDIR}/${prev_prev_gen}/logs/elites.json"
+        output_elite_file="${ELMFUZZ_RUNDIR}/${prev_gen}/logs/elites.json"
         # Ensure the input elites file exists (create empty file if missing)
 
         if [ ! -f "$input_elite_file" ]; then
@@ -150,10 +150,11 @@ for model_name in $MODELS ; do
         GOLOG="${LOGDIR}/outputgen_${MODEL}.jsonl"
         GVOUT=$(./elmconfig.py get run.genvariant_dir -s MODEL=${MODEL} -s GEN=${prev_gen})
         GOOUT=$(./elmconfig.py get run.genoutput_dir -s MODEL=${MODEL} -s GEN=${prev_gen})
+
+        echo "====================== $model_name:$state_name ======================"
         python "$ELMFUZZ_RUNDIR"/seed_gen_${PROTOCOL_TYPE}.py \
             --input_seeds "${GOOUT}/${state_name}/" \
             --init_variants "${GVOUT}/${state_name}/"
-        echo "====================== $model_name:$state_name ======================"
         # TODO: have genvariants_parallel.py do all the models at once
         # Will have to add in model-specific args to the config and merge
         # in the starcoder_diff script

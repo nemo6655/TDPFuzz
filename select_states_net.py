@@ -212,41 +212,65 @@ def main(cov_file, elites_file, gen):
     # Filter out 0000 and 0001
     target_pools = [p for p in state_pools if p not in ['0000', '0001']]
     
-    if not target_pools:
-        print("No other state pools to distribute to.")
-        return
+    distribution_results = {}
 
-    # Get list of seeds in 0000 (the elites)
-    seeds_in_0000 = [os.path.join(dest_0000, f) for f in os.listdir(dest_0000) if os.path.isfile(os.path.join(dest_0000, f))]
-    num_seeds = len(seeds_in_0000)
-    num_targets = len(target_pools)
-    
-    if num_seeds == 0:
-        print("No seeds in 0000 to distribute.")
-        return
-
-    print(f"Distributing {num_seeds} seeds from 0000 to {num_targets} pools: {target_pools}")
-    
-    # Average distribution (splitting the set)
-    chunk_size = math.ceil(num_seeds / num_targets)
-    
-    for i, pool in enumerate(target_pools):
-        dest_pool = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
-        os.makedirs(dest_pool, exist_ok=True)
+    if target_pools:
+        # Get list of seeds in 0000 (the elites)
+        seeds_in_0000 = [os.path.join(dest_0000, f) for f in os.listdir(dest_0000) if os.path.isfile(os.path.join(dest_0000, f))]
+        num_seeds = len(seeds_in_0000)
+        num_targets = len(target_pools)
         
-        start_idx = i * chunk_size
-        end_idx = min((i + 1) * chunk_size, num_seeds)
-        
-        chunk = seeds_in_0000[start_idx:end_idx]
-        
-        if not chunk:
-            print(f"  Pool {pool}: No seeds assigned (ran out of seeds).")
-            continue
-
-        for seed_path in chunk:
-            shutil.copy(seed_path, dest_pool)
+        if num_seeds > 0:
+            print(f"Distributing {num_seeds} seeds from 0000 to {num_targets} pools: {target_pools}")
             
-        print(f"  Pool {pool}: Copied {len(chunk)} seeds.")
+            # Average distribution (splitting the set)
+            chunk_size = math.ceil(num_seeds / num_targets)
+            
+            for i, pool in enumerate(target_pools):
+                dest_pool = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
+                os.makedirs(dest_pool, exist_ok=True)
+                
+                start_idx = i * chunk_size
+                end_idx = min((i + 1) * chunk_size, num_seeds)
+                
+                chunk = seeds_in_0000[start_idx:end_idx]
+                distribution_results[pool] = [os.path.basename(s) for s in chunk]
+                
+                if not chunk:
+                    print(f"  Pool {pool}: No seeds assigned (ran out of seeds).")
+                    continue
+
+                for seed_path in chunk:
+                    shutil.copy(seed_path, dest_pool)
+                    
+                print(f"  Pool {pool}: Copied {len(chunk)} seeds.")
+        else:
+            print("No seeds in 0000 to distribute.")
+    else:
+        print("No other state pools to distribute to.")
+
+    # 4. Write selection results to log file
+    log_dir = os.path.join(elmfuzz_rundir, gen, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    state_log_path = os.path.join(log_dir, 'state.log')
+    
+    with open(state_log_path, 'w') as f:
+        f.write("Pool 0000 (Elites):\n")
+        for seed in sorted(elite_seeds_copied):
+            f.write(f"{seed}\n")
+            
+        f.write("\nPool 0001 (Missing Transitions):\n")
+        for seed_path in sorted(seeds_to_copy_for_missing):
+            f.write(f"{os.path.basename(seed_path)}\n")
+            
+        f.write("\nDistribution:\n")
+        if distribution_results:
+            for pool, seeds in sorted(distribution_results.items()):
+                f.write(f"Pool {pool}:\n")
+                for s in sorted(seeds):
+                    f.write(f"{s}\n")
+        else:
+            f.write("No distribution performed.\n")
 
 if __name__ == '__main__':
     main()

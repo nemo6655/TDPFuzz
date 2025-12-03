@@ -43,7 +43,17 @@ def generate_completion(
     }
     if stop is not None:
         data['parameters']['stop'] = stop
-    return requests.post(f'{ENDPOINT}/generate', json=data).json()
+    try:
+        response = requests.post(f'{ENDPOINT}/generate', json=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}", file=sys.stderr)
+        return {}
+    except requests.exceptions.JSONDecodeError as e:
+        print(f"JSON decode error: {e}", file=sys.stderr)
+        print(f"Response text: {response.text}", file=sys.stderr)
+        return {}
 
 def infilling_prompt_llama(
     pre: str,
