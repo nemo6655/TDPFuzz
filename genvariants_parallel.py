@@ -203,8 +203,14 @@ def generate_completion_glm(
             }
 
     # 如果出错，返回错误信息
+    error_msg = f"GLM API error: {response.status_code} - {response.text}"
+
+    # 检查是否是429错误（并发限制）
+    if response.status_code == 429:
+        print(f"API并发限制错误 (429): {response.text}", file=sys.stderr)
+
     return {
-        "error": f"GLM API error: {response.status_code} - {response.text}"
+        "error": error_msg
     }
 
 def infilling_prompt_llama(
@@ -565,33 +571,118 @@ def main():
         for filename in args.files:
             worklist.append((i, filename))
             i += 1
-    # pbar = tqdm(total=len(worklist), desc='Generating', unit='variant')
-    with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = []
-        for i, filename in worklist:
-            future = executor.submit(generate_variant, i, generators, model, endpoint, filename, args)
-            # future.add_done_callback(lambda _: pbar.update())
-            futures.append(future)
+    # 使用二分法动态调整并发数
+    max_jobs = args.jobs  # 初始最大并发数
+    min_jobs = 1         # 最小并发数
+    current_jobs = max_jobs  # 当前并发数
 
-        # 统计成功和失败的任务
-        success_count = 0
-        failure_count = 0
-
-        for future in as_completed(futures):
+    # 检查是否有429错误（并发限制）
+    def has_rate_limit_error(futures):
+        for future in futures:
             try:
-                res = future.result()
-                if res is not None:
-                    print(res, flush=True)
-                    success_count += 1
-                else:
-                    failure_count += 1
-            except Exception as e:
-                print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
-                failure_count += 1
+                # 检查任务是否完成
+                if future.done():
+                    try:
+                        res = future.result()
+                        # 检查结果中是否有429错误
+                        if isinstance(res, dict) and "error" in res and "1302" in res.get("error", ""):
+                            return True
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        return False
 
-        # 打印统计信息
-        print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
-    # pbar.close()
+    # 尝试使用当前并发数执行任务
+    def try_with_jobs(jobs):
+        nonlocal worklist, generators, model, endpoint, args
+
+        print(f"尝试使用并发数: {jobs}", flush=True)
+        with ThreadPoolExecutor(max_workers=jobs) as executor:
+            futures = []
+            for i, filename in worklist:
+                future = executor.submit(generate_variant, i, generators, model, endpoint, filename, args)
+                futures.append(future)
+
+            # 统计成功和失败的任务
+            success_count = 0
+            failure_count = 0
+            rate_limit_hit = False
+
+            # 等待部分任务完成以检查是否有429错误
+            completed_count = 0
+            check_threshold = min(jobs, len(futures))  # 检查至少等于并发数的任务
+
+            for future in as_completed(futures):
+                try:
+                    res = future.result()
+                    if res is not None:
+                        print(res, flush=True)
+                        success_count += 1
+                    else:
+                        failure_count += 1
+                except Exception as e:
+                    print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                    failure_count += 1
+
+                completed_count += 1
+
+                # 检查是否有429错误
+                if has_rate_limit_error(futures):
+                    rate_limit_hit = True
+                    print(f"检测到API并发限制错误 (429)", file=sys.stderr)
+                    break
+
+                # 如果已经检查了足够多的任务且没有429错误，继续执行
+                if completed_count >= check_threshold and not rate_limit_hit:
+                    # 继续等待剩余任务完成
+                    continue
+
+            # 如果没有遇到429错误，等待所有任务完成
+            if not rate_limit_hit:
+                for future in futures:
+                    if not future.done():
+                        try:
+                            res = future.result()
+                            if res is not None:
+                                print(res, flush=True)
+                                success_count += 1
+                            else:
+                                failure_count += 1
+                        except Exception as e:
+                            print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                            failure_count += 1
+
+            # 打印统计信息
+            print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
+
+            return rate_limit_hit, success_count, failure_count
+
+    # 使用二分法找到合适的并发数
+    best_jobs = min_jobs
+    best_success = 0
+
+    while min_jobs <= max_jobs:
+        current_jobs = (min_jobs + max_jobs) // 2
+        rate_limit_hit, success_count, failure_count = try_with_jobs(current_jobs)
+
+        if not rate_limit_hit:
+            # 当前并发数可用，尝试增加
+            best_jobs = current_jobs
+            best_success = success_count
+            min_jobs = current_jobs + 1
+            print(f"并发数 {current_jobs} 可用，尝试增加", flush=True)
+        else:
+            # 当前并发数过高，尝试减少
+            max_jobs = current_jobs - 1
+            print(f"并发数 {current_jobs} 过高，尝试减少", flush=True)
+
+    print(f"最终使用并发数: {best_jobs}，成功生成 {best_success} 个变体", flush=True)
+
+    # 使用最佳并发数重新运行所有任务（如果之前的尝试被中断）
+    if best_jobs < args.jobs:
+        print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
+        try_with_jobs(best_jobs)
 
 def on_nsf_access() -> dict[str, str] | None:
     if not 'ACCESS_INFO' in os.environ:
