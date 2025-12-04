@@ -19,7 +19,14 @@ def get_endpoints() -> Dict[str, str]:
 
 def model_info():
     """Get information about the model."""
-    return requests.get(f'{ENDPOINT}/info').json()
+    # 检查是否是GLM模型
+    model_name = globals().get('model', '')
+    if model_name and model_name.startswith('glm'):
+        # GLM模型没有/info端点，返回模型名称
+        return {'model_id': model_name}
+    else:
+        # 其他模型使用标准的/info端点
+        return requests.get(f'{ENDPOINT}/info').json()
 
 def generate_completion(
         prompt,
@@ -453,5 +460,15 @@ def on_nsf_access() -> dict[str, str] | None:
 
 if __name__ == '__main__':
     access_info = on_nsf_access()
-    ENDPOINT = get_endpoints()['codellama/CodeLlama-13b-hf'] if access_info is None else access_info['endpoint']
+    if access_info is None:
+        endpoints = get_endpoints()
+        if endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
+            ENDPOINT = endpoints['codellama/CodeLlama-13b-hf']
+        elif endpoints and endpoints.get('glm-4.5-flash'):  # 暂时不考虑不同glm模型兼容
+            ENDPOINT = endpoints['glm-4.5-flash']
+        else:
+            ENDPOINT = endpoints['codellama/CodeLlama-13b-hf']
+    else:
+        ENDPOINT = access_info['endpoint']
+    print(ENDPOINT)
     main()
