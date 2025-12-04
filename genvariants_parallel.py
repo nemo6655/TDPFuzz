@@ -4,6 +4,7 @@ import json
 import random
 import os
 import sys
+import time
 from typing import List, Optional, Dict
 from argparse import ArgumentParser
 import requests
@@ -658,31 +659,172 @@ def main():
 
             return rate_limit_hit, success_count, failure_count
 
-    # 使用二分法找到合适的并发数
-    best_jobs = min_jobs
-    best_success = 0
-
-    while min_jobs <= max_jobs:
-        current_jobs = (min_jobs + max_jobs) // 2
-        rate_limit_hit, success_count, failure_count = try_with_jobs(current_jobs)
-
-        if not rate_limit_hit:
-            # 当前并发数可用，尝试增加
-            best_jobs = current_jobs
-            best_success = success_count
-            min_jobs = current_jobs + 1
-            print(f"并发数 {current_jobs} 可用，尝试增加", flush=True)
+    # 尝试加载之前保存的最佳并发数
+    saved_best_jobs = load_best_jobs(model)
+    if saved_best_jobs:
+        print(f"从配置文件加载到模型 {model} 的最佳并发数: {saved_best_jobs}", flush=True)
+        # 如果保存的最佳并发数小于请求的并发数，使用保存的值作为初始值
+        if saved_best_jobs < args.jobs:
+            best_jobs = saved_best_jobs
         else:
-            # 当前并发数过高，尝试减少
-            max_jobs = current_jobs - 1
-            print(f"并发数 {current_jobs} 过高，尝试减少", flush=True)
+            best_jobs = 1
+    else:
+        best_jobs = 1  # 初始最佳并发数
+        
+    best_efficiency = 0  # 初始最佳效率（成功数/时间）
+    best_success = 0  # 初始成功数
 
-    print(f"最终使用并发数: {best_jobs}，成功生成 {best_success} 个变体", flush=True)
+    # 测试阶段：逐步增加并发数，找到效率最高的点
+    test_jobs = 1
+    test_results = {}  # 记录测试结果：{并发数: (成功率, 效率)}
+
+    # 首先测试几个基础点
+    test_points = [1, 2, 4, 8]
+    
+    # 如果有保存的最佳并发数，优先测试它
+    if saved_best_jobs and saved_best_jobs <= args.jobs and saved_best_jobs not in test_points:
+        test_points.insert(0, saved_best_jobs)  # 插入到开头，优先测试
+        
+    if args.jobs < max(test_points):
+        test_points = [p for p in test_points if p <= args.jobs]
+        if args.jobs not in test_points:
+            test_points.append(args.jobs)
+    else:
+        # 如果args.jobs很大，添加一些中间点
+        test_points.extend([16, 32])
+        test_points = sorted(list(set(test_points)))
+        test_points = [p for p in test_points if p <= args.jobs]
+
+    # 测试各个点
+    for jobs in test_points:
+        print(f"测试并发数: {jobs}", flush=True)
+        start_time = time.time()
+        rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
+        elapsed_time = time.time() - start_time
+
+        # 计算效率（成功数/时间）
+        efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
+        test_results[jobs] = (success_count, efficiency)
+
+        print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True)
+
+        # 更新最佳值
+        if efficiency > best_efficiency:
+            best_jobs = jobs
+            best_efficiency = efficiency
+            best_success = success_count
+
+        # 如果遇到429错误，停止测试更高的并发数
+        if rate_limit_hit:
+            print(f"并发数 {jobs} 遇到限制，停止测试更高的并发数", flush=True)
+            break
+
+    # 如果测试点太少，或者最佳点在边界，进行精细化测试
+    if len(test_points) >= 2 and best_jobs not in [min(test_points), max(test_points)]:
+        # 在最佳点周围进行精细化测试
+        lower_bound = max(1, best_jobs // 2)
+        upper_bound = min(args.jobs, best_jobs * 2)
+
+        # 生成测试点（包括最佳点周围的点）
+        fine_test_points = []
+        for i in range(lower_bound, upper_bound + 1):
+            if i not in test_points:
+                fine_test_points.append(i)
+
+        # 按照与最佳点的距离排序，优先测试接近最佳点的值
+        fine_test_points.sort(key=lambda x: abs(x - best_jobs))
+
+        # 限制精细化测试的点数
+        if len(fine_test_points) > 5:
+            fine_test_points = fine_test_points[:5]
+
+        for jobs in fine_test_points:
+            print(f"精细化测试并发数: {jobs}", flush=True)
+            start_time = time.time()
+            rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
+            elapsed_time = time.time() - start_time
+
+            # 计算效率
+            efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
+            test_results[jobs] = (success_count, efficiency)
+
+            print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True)
+
+            # 更新最佳值
+            if efficiency > best_efficiency:
+                best_jobs = jobs
+                best_efficiency = efficiency
+                best_success = success_count
+
+            # 如果遇到429错误，停止测试更高的并发数
+            if rate_limit_hit:
+                print(f"并发数 {jobs} 遇到限制，停止测试更高的并发数", flush=True)
+                break
+
+    # 打印所有测试结果
+    print("\n所有测试结果:", flush=True)
+    for jobs, (success, efficiency) in sorted(test_results.items()):
+        print(f"并发数 {jobs}: 成功 {success}, 效率 {efficiency:.2f}/s", flush=True)
+
+    print(f"\n最终使用并发数: {best_jobs}，效率 {best_efficiency:.2f}/s，成功生成 {best_success} 个变体", flush=True)
+
+    # 保存找到的最佳并发数
+    save_best_jobs(model, best_jobs)
 
     # 使用最佳并发数重新运行所有任务（如果之前的尝试被中断）
     if best_jobs < args.jobs:
         print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
         try_with_jobs(best_jobs)
+
+def save_best_jobs(model: str, best_jobs: int):
+    """保存找到的最佳并发数到文件中，以便下次使用"""
+    try:
+        # 创建配置目录（如果不存在）
+        config_dir = os.path.expanduser("~/.config/tdpfuzz")
+        os.makedirs(config_dir, exist_ok=True)
+
+        # 配置文件路径
+        config_file = os.path.join(config_dir, "best_jobs.json")
+
+        # 读取现有配置（如果存在）
+        config = {}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                config = {}
+
+        # 更新配置
+        config[model] = best_jobs
+
+        # 保存配置
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+
+        print(f"已保存模型 {model} 的最佳并发数 {best_jobs} 到配置文件", flush=True)
+    except Exception as e:
+        print(f"保存最佳并发数时出错: {str(e)}", file=sys.stderr)
+
+def load_best_jobs(model: str) -> Optional[int]:
+    """从配置文件中加载模型的最佳并发数"""
+    try:
+        # 配置文件路径
+        config_file = os.path.expanduser("~/.config/tdpfuzz/best_jobs.json")
+
+        # 检查文件是否存在
+        if not os.path.exists(config_file):
+            return None
+
+        # 读取配置
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+
+        # 返回模型的最佳并发数（如果存在）
+        return config.get(model)
+    except Exception as e:
+        print(f"加载最佳并发数时出错: {str(e)}", file=sys.stderr)
+        return None
 
 def on_nsf_access() -> dict[str, str] | None:
     if not 'ACCESS_INFO' in os.environ:
