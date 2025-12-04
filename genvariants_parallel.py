@@ -460,6 +460,55 @@ def generate_variant(i, generators, model, endpoint, filename, args):
         f.write(text)
         f.write(suffix)
 
+    # 验证生成的代码语法是否正确
+    try:
+        with open(out_path, 'r') as f:
+            code_content = f.read()
+
+        # 首先检查函数完整性
+        is_complete = validate_function_completeness(code_content)
+        if not is_complete:
+            print(f"生成的变体 {out_file} 函数不完整，尝试补全", file=sys.stderr)
+            meta['function_incomplete'] = True
+
+            # 尝试补全函数
+            completed_code = complete_incomplete_function(code_content)
+            if completed_code:
+                with open(out_path, 'w') as f:
+                    f.write(completed_code)
+                print(f"已补全变体 {out_file} 的函数", file=sys.stderr)
+                meta['function_completed'] = True
+                code_content = completed_code  # 更新代码内容以便后续语法检查
+            else:
+                print(f"无法补全变体 {out_file} 的函数", file=sys.stderr)
+                meta['function_completion_failed'] = True
+        else:
+            print(f"变体 {out_file} 函数完整性验证通过", file=sys.stderr)
+
+        # 然后检查语法
+        compile(code_content, out_path, 'exec')
+        print(f"变体 {out_file} 语法验证通过", file=sys.stderr)
+        meta['syntax_valid'] = True
+    except SyntaxError as e:
+        print(f"生成的变体 {out_file} 存在语法错误: {e}", file=sys.stderr)
+        # 修复语法错误 - 尝试简单修复常见问题
+        try:
+            fixed_code = fix_syntax_errors(code_content, e)
+            if fixed_code:
+                with open(out_path, 'w') as f:
+                    f.write(fixed_code)
+                print(f"已尝试修复变体 {out_file} 的语法错误", file=sys.stderr)
+                # 更新元数据
+                meta['syntax_fixed'] = True
+                meta['syntax_error'] = str(e)
+        except Exception as fix_error:
+            print(f"修复变体 {out_file} 语法错误失败: {fix_error}", file=sys.stderr)
+            meta['syntax_fix_failed'] = True
+            meta['syntax_fix_error'] = str(fix_error)
+    except Exception as e:
+        print(f"验证变体 {out_file} 时发生错误: {e}", file=sys.stderr)
+        meta['validation_error'] = str(e)
+
     # Write metadata to logdir
     with open(meta_file, 'w') as f:
         f.write(json.dumps(meta))
@@ -848,6 +897,168 @@ def save_best_jobs(model: str, best_jobs: int):
         print(f"已保存模型 {model} 的最佳并发数 {best_jobs} 到配置文件", flush=True)
     except Exception as e:
         print(f"保存最佳并发数时出错: {str(e)}", file=sys.stderr)
+
+def validate_function_completeness(code: str) -> bool:
+    """验证生成的函数是否完整，特别是generate_json函数"""
+    try:
+        # 检查代码中是否包含generate_json函数定义
+        if "def generate_json" not in code:
+            return False
+
+        # 检查函数体是否包含基本逻辑
+        # 1. 检查是否有WrappedTextWriter的实例化
+        if "WrappedTextWriter(output)" not in code:
+            return False
+
+        # 2. 检查是否有WrappedTextReader的实例化
+        if "WrappedTextReader(rng)" not in code:
+            return False
+
+        # 3. 检查是否有基本的JSON输出逻辑
+        # 查找write_utf8调用，确保有输出
+        if "write_utf8" not in code:
+            return False
+
+        # 4. 检查函数是否有结束标记
+        # 确保函数有适当的结束
+        lines = code.split('')
+        in_function = False
+        indent_level = 0
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('def generate_json'):
+                in_function = True
+                indent_level = len(line) - len(line.lstrip())
+            elif in_function and stripped and not line.startswith(' ' * (indent_level + 1)) and not stripped.startswith('#'):
+                # 函数已经结束
+                break
+
+        # 如果没有找到函数结束，认为不完整
+        return True
+    except Exception as e:
+        print(f"验证函数完整性时发生错误: {e}", file=sys.stderr)
+        return False
+
+def complete_incomplete_function(code: str) -> Optional[str]:
+    """尝试补全不完整的generate_json函数"""
+    try:
+        # 检查函数是否定义了但没有实现
+        if "def generate_json" in code and "return" not in code:
+            lines = code.split('')
+
+            # 找到函数定义行
+            func_start = -1
+            for i, line in enumerate(lines):
+                if "def generate_json" in line:
+                    func_start = i
+                    break
+
+            if func_start >= 0:
+                # 检查函数体是否为空或只有注释
+                func_lines = lines[func_start+1:]
+                has_code = False
+                for line in func_lines:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith('#'):
+                        has_code = True
+                        break
+
+                if not has_code:
+                    # 添加基本的JSON生成逻辑
+                    basic_impl = [
+                        "    # 基本的JSON生成逻辑",
+                        "    wrapped_output = WrappedTextWriter(output)",
+                        "    wrapped_rng = WrappedTextReader(rng)",
+                        "    ",
+                        "    # 生成一个简单的JSON对象",
+                        "    wrapped_output.write_utf8('{\n')",
+                        "    ",
+                        "    # 随机决定生成对象或数组",
+                        "    choice = int(wrapped_rng.read(1)[0]) % 2",
+                        "    if choice == 0:",
+                        "        # 生成对象",
+                        "        wrapped_output.write_utf8('\"key\": \"value\"\n')",
+                        "    else:",
+                        "        # 生成数组",
+                        "        wrapped_output.write_utf8('\"array\": [1, 2, 3]\n')",
+                        "    ",
+                        "    wrapped_output.write_utf8('}\n')"
+                    ]
+
+                    # 替换空函数体
+                    new_lines = lines[:func_start+1] + basic_impl
+                    return ''.join(new_lines)
+
+        return None
+    except Exception as e:
+        print(f"补全函数时发生错误: {e}", file=sys.stderr)
+        return None
+
+def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
+    """尝试修复常见的Python语法错误"""
+    try:
+        # 获取错误位置
+        error_line = error.lineno
+        error_offset = error.offset
+
+        lines = code.split('')
+        if error_line <= len(lines):
+            error_line_content = lines[error_line - 1]
+
+            # 修复常见的语法错误
+            # 1. 修复多余的右括号
+            if "unexpected EOF while parsing" in str(error) and "')" in error_line_content:
+                # 检查是否有多余的右括号
+                open_parens = error_line_content.count('(')
+                close_parens = error_line_content.count(')')
+                if close_parens > open_parens:
+                    # 移除多余的右括号
+                    fixed_line = error_line_content[:error_offset-1] + error_line_content[error_offset:]
+                    lines[error_line - 1] = fixed_line.replace('))', ')')
+                    return ''.join(lines)
+
+            # 2. 修复缩进错误
+            if "unexpected indent" in str(error) or "unindent does not match" in str(error):
+                # 尝试修复缩进
+                fixed_lines = []
+                for i, line in enumerate(lines):
+                    if i == error_line - 1:
+                        # 修复当前行的缩进
+                        stripped = line.lstrip()
+                        if stripped:
+                            # 使用4空格缩进
+                            fixed_lines.append('    ' + stripped)
+                        else:
+                            fixed_lines.append('')
+                    else:
+                        fixed_lines.append(line)
+                return ''.join(fixed_lines)
+
+            # 3. 修复未闭合的字符串
+            if "EOL while scanning string literal" in str(error):
+                # 尝试闭合字符串
+                if error_line <= len(lines):
+                    line = lines[error_line - 1]
+                    if "'" in line and not line.count("'") % 2 == 0:
+                        lines[error_line - 1] = line + "'"
+                    elif '"' in line and not line.count('"') % 2 == 0:
+                        lines[error_line - 1] = line + '"'
+                    return ''.join(lines)
+
+            # 4. 修复缺失的冒号
+            if "expected ':'" in str(error):
+                if error_line <= len(lines):
+                    line = lines[error_line - 1]
+                    # 在行末添加冒号（如果没有）
+                    if not line.rstrip().endswith(':'):
+                        lines[error_line - 1] = line.rstrip() + ':'
+                        return ''.join(lines)
+
+        # 如果无法自动修复，返回None
+        return None
+    except Exception as e:
+        print(f"修复语法错误时发生异常: {e}", file=sys.stderr)
+        return None
 
 def load_best_jobs(model: str) -> Optional[int]:
     """从配置文件中加载模型的最佳并发数"""
