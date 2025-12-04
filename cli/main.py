@@ -131,6 +131,7 @@ def config(list_: bool, set: tuple[str, str], get: str):
             |logging.email_smtp_port (default: 587): SMTP port for sending emails.
             |logging.email_smtp_password (default: dummypassword): SMTP password for sending emails.
             |tgi.huggingface_token (default: None): Hugging Face token for accessing private models.
+            |glm.api_key (default: None): GLM API key for accessing GLM models.
         """, delimiter="\n"))
     elif set is not None:
         config = toml.load(os.path.join(MAIN_CLI_DIR, "config.toml"))
@@ -163,6 +164,26 @@ def config(list_: bool, set: tuple[str, str], get: str):
                 subprocess.run(cmd3, check=True)
                 click.echo(f"{key} := {value}")
                 return
+            case "glm.api_key":
+                # 创建GLM配置目录，类似于Hugging Face的配置目录
+                glm_config_path = "/home/appuser/.config/glm"
+                if not os.path.exists(glm_config_path):
+                    os.makedirs(glm_config_path, exist_ok=True)
+                # 将API Key写入token文件，与Hugging Face的token文件格式一致
+                with open(os.path.join(glm_config_path, "token"), "w") as f:
+                    f.write(value)
+                # 如果root目录下不存在对应配置，则创建
+                if not os.path.exists("/root/.config/glm"):
+                    cmd1 = ["sudo", "mkdir", "-p", "/root/.config/glm"]
+                    subprocess.run(cmd1, check=True)
+                # 创建符号链接，与Hugging Face的处理方式一致
+                cmd2 = ["sudo", "ln", "-f", "-s", os.path.join(glm_config_path, "token"), "/root/.config/glm/token"]
+                subprocess.run(cmd2, check=True)
+                # 创建配置文件的符号链接，与Hugging Face的处理方式一致
+                cmd3 = ["ln", "-f", "-s", "/home/appuser/elmfuzz/cli/config.toml", "/elfuzz/config.toml"]
+                subprocess.run(cmd3, check=True)
+                click.echo(f"{key} := {value}")
+                return
             case _:
                 click.echo(f"Unknown configuration option: {key}")
         toml.dump(config, os.path.join(MAIN_CLI_DIR, "config.toml"))
@@ -184,6 +205,12 @@ def config(list_: bool, set: tuple[str, str], get: str):
                 value = config["logging"]["email_smtp_password"]
             case "tgi.huggingface_token":
                 token_path = "/root/.config/huggingface/token"
+                if not os.path.exists(token_path):
+                    click.echo("None")
+                with open(token_path, "r") as f:
+                    value = f.read().strip()
+            case "glm.api_key":
+                token_path = "/home/appuser/.config/glm/token"
                 if not os.path.exists(token_path):
                     click.echo("None")
                 with open(token_path, "r") as f:

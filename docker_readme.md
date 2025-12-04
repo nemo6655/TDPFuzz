@@ -47,6 +47,12 @@ The experiments require pulling models from Hugging Face. You need to set up you
 elfuzz config --set tgi.huggingface_token "<your_token>"
 ```
 
+For GLM models, set your API key:
+
+```bash
+elfuzz config --set glm.api_key "<your_glm_api_key>"
+```
+
 Besides, you can optionally use `elfuzz config` to configure settings such as email notifications.
 
 ## Experiments

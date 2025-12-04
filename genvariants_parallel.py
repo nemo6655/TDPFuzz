@@ -107,9 +107,25 @@ def generate_completion_glm(
         stop=None
 ):
     """Generate a completion of the prompt using GLM API."""
+    # 首先尝试从环境变量获取
     glm_api_key = os.getenv('GLM_API_KEY')
+
+    # 如果环境变量不存在，尝试从配置文件读取，与Hugging Face token的处理方式一致
     if not glm_api_key:
-        raise ValueError("GLM_API_KEY environment variable not set")
+        token_paths = [
+            "/home/appuser/.config/glm/token",  # 容器内appuser配置
+            os.path.expanduser("~/.config/glm/token"),  # 用户级配置
+        ]
+
+        for token_path in token_paths:
+            if os.path.exists(token_path):
+                with open(token_path, "r") as f:
+                    glm_api_key = f.read().strip()
+                break
+
+    if not glm_api_key:
+        raise ValueError("GLM API Key not found in environment variables or config files")
+
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {glm_api_key}"
