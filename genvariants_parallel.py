@@ -10,10 +10,41 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_endpoints() -> Dict[str, str]:
     result = dict()
-    endpoint_list = os.getenv('ENDPOINTS').split(' ') # type: ignore
-    for endpoint_pair in endpoint_list:
-        (model, endpoint) = endpoint_pair.split(':', 1)
-        result[model] = endpoint
+    # Try to get endpoints from environment variable first
+    endpoints_env = os.getenv('ENDPOINTS')
+    if endpoints_env:
+        endpoint_list = endpoints_env.split(' ') # type: ignore
+        for endpoint_pair in endpoint_list:
+            (model, endpoint) = endpoint_pair.split(':', 1)
+            result[model] = endpoint
+        return result
+    
+    # If not in environment, try to get from config file
+    try:
+        import sys
+        sys.path.insert(0, '.')
+        from elmconfig import ELMFuzzConfig
+        import argparse
+        
+        # Create a config parser
+        config = ELMFuzzConfig(prog='genvariants_parallel')
+        
+        # Parse args to get config file
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--config', type=str, default=None)
+        args, _ = parser.parse_known_args()
+        
+        if args.config:
+            # Load the config file
+            conf = config.yaml.load(open(args.config).read())
+            if 'model' in conf and 'endpoints' in conf['model']:
+                for endpoint_pair in conf['model']['endpoints']:
+                    if ':' in endpoint_pair:
+                        (model, endpoint) = endpoint_pair.split(':', 1)
+                        result[model] = endpoint
+    except Exception as e:
+        print(f"Warning: Could not load endpoints from config file: {e}", file=sys.stderr)
+    
     return result
 
 
