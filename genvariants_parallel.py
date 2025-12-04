@@ -10,40 +10,73 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_endpoints() -> Dict[str, str]:
     result = dict()
-    endpoint_list = os.getenv('ENDPOINTS').split(' ') # type: ignore
-    for endpoint_pair in endpoint_list:
-        (model, endpoint) = endpoint_pair.split(':', 1)
-        result[model] = endpoint
+    # Try to get endpoints from environment variable first
+    endpoints_env = os.getenv('ENDPOINTS')
+    if endpoints_env:
+        endpoint_list = endpoints_env.split(' ') # type: ignore
+        for endpoint_pair in endpoint_list:
+            (model, endpoint) = endpoint_pair.split(':', 1)
+            result[model] = endpoint
+        return result
+    
+    # If not in environment, try to get from config file
+    try:
+        import sys
+        sys.path.insert(0, '.')
+        from elmconfig import ELMFuzzConfig
+        import argparse
+        
+        # Create a config parser
+        config = ELMFuzzConfig(prog='genvariants_parallel')
+        
+        # Parse args to get config file
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--config', type=str, default=None)
+        args, _ = parser.parse_known_args()
+        
+        if args.config:
+            # Load the config file
+            conf = config.yaml.load(open(args.config).read())
+            if 'model' in conf and 'endpoints' in conf['model']:
+                for endpoint_pair in conf['model']['endpoints']:
+                    if ':' in endpoint_pair:
+                        (model, endpoint) = endpoint_pair.split(':', 1)
+                        result[model] = endpoint
+    except Exception as e:
+        print(f"Warning: Could not load endpoints from config file: {e}", file=sys.stderr)
+    
     return result
 
 
-def model_info():
+def model_info(model_name: str, endpoint: str):
     """Get information about the model."""
     # 检查是否是GLM模型
-    model_name = globals().get('model', '')
     if model_name and model_name.startswith('glm'):
         # GLM模型没有/info端点，返回模型名称
         return {'model_id': model_name}
     else:
         # 其他模型使用标准的/info端点
-        return requests.get(f'{ENDPOINT}/info').json()
+        return requests.get(f'{endpoint}/info').json()
 
 def generate_completion(
         prompt,
+        endpoint,
+        model_name,
         temperature=0.2,
         max_new_tokens=1200,
         repetition_penalty=1.1,
-        stop=None, model_name=None
+        stop=None
 ):
     """Generate a completion of the prompt."""
     if model_name and model_name.startswith('glm'):
-        return generate_completion_glm(prompt, temperature, max_new_tokens, repetition_penalty, stop)
+        return generate_completion_glm(prompt, endpoint, model_name, temperature, max_new_tokens, repetition_penalty, stop)
     else:
-        return generate_completion_tgi(prompt, temperature, max_new_tokens, repetition_penalty, stop)
+        return generate_completion_tgi(prompt, endpoint, temperature, max_new_tokens, repetition_penalty, stop)
 
 
 def generate_completion_tgi(
         prompt,
+        endpoint,
         temperature=0.2,
         max_new_tokens=1200,
         repetition_penalty=1.1,
@@ -62,23 +95,25 @@ def generate_completion_tgi(
     }
     if stop is not None:
         data['parameters']['stop'] = stop
-    return requests.post(f'{ENDPOINT}/generate', json=data).json()
+    return requests.post(f'{endpoint}/generate', json=data).json()
 
 def generate_completion_glm(
         prompt,
+        endpoint,
+        model_name,
         temperature=0.2,
         max_new_tokens=1200,
         repetition_penalty=1.1,
         stop=None
 ):
     """Generate a completion of the prompt using GLM API."""
+    glm_api_key = os.getenv('GLM_API_KEY')
+    if not glm_api_key:
+        raise ValueError("GLM_API_KEY environment variable not set")
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.getenv('GLM_API_KEY', 'ebe3a97c24334436ba087f3cc7e1e75c.g46A8qOGoi2o5F6P')}"
+        "Authorization": f"Bearer {glm_api_key}"
     }
-
-    # 使用传入的模型名，如果没有则从全局变量获取，最后使用默认值
-    model_name = globals().get('model', 'glm-4.5-flash')
 
     data = {
         "model": model_name,
@@ -93,7 +128,7 @@ def generate_completion_glm(
         data["stop"] = stop
 
     response = requests.post(
-        ENDPOINT,
+        endpoint,
         headers=headers,
         json=data,
         timeout=30
@@ -229,7 +264,7 @@ def new_base(filename: str) -> tuple[str, str]:
         base = base[:first]
         return base, ext
 
-def generate_variant(i, generators, model, filename, args):
+def generate_variant(i, generators, model, endpoint, filename, args):
     # Pick a random generator
     generator = random.choice(generators)
     if generator == 'infilled':
@@ -277,6 +312,8 @@ def generate_variant(i, generators, model, filename, args):
 
     res = generate_completion(
         prompt,
+        endpoint,
+        model,
         stop=stop,
         **vars(args.gen),
     )
@@ -378,7 +415,6 @@ def init_parser(elm):
     elm.subgroup_help['gen'] = 'Generation parameters'
 
 def main():
-    global ENDPOINT
     global infilling_prompt
     import sys
     from elmconfig import ELMFuzzConfig
@@ -388,14 +424,15 @@ def main():
 
     try:
         access_info = on_nsf_access()
-        ENDPOINT = args.model.endpoints[args.model_name] if access_info is None else access_info['endpoint']
+        endpoint = args.model.endpoints[args.model_name] if access_info is None else access_info['endpoint']
     except KeyError:
-        print(f'WARNING: no endpoint for model {args.model_name}, using default: {ENDPOINT}', file=sys.stderr)
+        print(f'WARNING: no endpoint for model {args.model_name}', file=sys.stderr)
+        return
 
-    info = model_info()
+    info = model_info(args.model_name, endpoint)
     model = info['model_id']
     if model != args.model_name:
-        print(f'WARNING: Expected model {args.model_name}, but {ENDPOINT} is actually {model}', file=sys.stderr)
+        print(f'WARNING: Expected model {args.model_name}, but {endpoint} is actually {model}', file=sys.stderr)
 
     if model == 'bigcode/starcoder':
         infilling_prompt = infilling_prompt_starcoder
@@ -441,7 +478,7 @@ def main():
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
         futures = []
         for i, filename in worklist:
-            future = executor.submit(generate_variant, i, generators, model, filename, args)
+            future = executor.submit(generate_variant, i, generators, model, endpoint, filename, args)
             # future.add_done_callback(lambda _: pbar.update())
             futures.append(future)
         for future in as_completed(futures):
@@ -463,12 +500,12 @@ if __name__ == '__main__':
     if access_info is None:
         endpoints = get_endpoints()
         if endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
-            ENDPOINT = endpoints['codellama/CodeLlama-13b-hf']
+            endpoint = endpoints['codellama/CodeLlama-13b-hf']
         elif endpoints and endpoints.get('glm-4.5-flash'):  # 暂时不考虑不同glm模型兼容
-            ENDPOINT = endpoints['glm-4.5-flash']
+            endpoint = endpoints['glm-4.5-flash']
         else:
-            ENDPOINT = endpoints['codellama/CodeLlama-13b-hf']
+            endpoint = endpoints['codellama/CodeLlama-13b-hf']
     else:
-        ENDPOINT = access_info['endpoint']
-    print(ENDPOINT)
+        endpoint = access_info['endpoint']
+    print(endpoint)
     main()

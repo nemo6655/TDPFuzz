@@ -495,7 +495,16 @@ def main():
     ), file=output_log)
 
     # The first line sent by genvariants is the number of modules it will produce
-    module_count = int(sys.stdin.readline())
+    try:
+        first_line = sys.stdin.readline()
+        # Skip any URL lines that might be in the input
+        while first_line.strip().startswith('http'):
+            first_line = sys.stdin.readline()
+        module_count = int(first_line)
+    except ValueError as e:
+        print(f"Error reading module count: {e}", file=sys.stderr)
+        print(f"Received input: {first_line}", file=sys.stderr)
+        sys.exit(1)
     
     gen: str = args.generation
     resample = get_resample_iterations()
