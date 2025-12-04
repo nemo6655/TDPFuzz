@@ -614,7 +614,7 @@ def main():
     def try_with_jobs(jobs):
         nonlocal worklist, generators, model, endpoint, args
 
-        print(f"尝试使用并发数: {jobs}", flush=True)
+        print(f"尝试使用并发数: {jobs}", flush=True, file=sys.stderr)
         with ThreadPoolExecutor(max_workers=jobs) as executor:
             futures = []
             for i, filename in worklist:
@@ -686,7 +686,7 @@ def main():
             best_jobs = 1
     else:
         best_jobs = 1  # 初始最佳并发数
-        
+
     best_efficiency = 0  # 初始最佳效率（成功数/时间）
     best_success = 0  # 初始成功数
 
@@ -702,11 +702,11 @@ def main():
     else:
         max_concurrent = args.jobs
         test_points = [1, 2, 4, 8]
-    
+
     # 如果有保存的最佳并发数，优先测试它
     if saved_best_jobs and saved_best_jobs <= max_concurrent and saved_best_jobs not in test_points:
         test_points.insert(0, saved_best_jobs)  # 插入到开头，优先测试
-        
+
     if max_concurrent < max(test_points):
         test_points = [p for p in test_points if p <= max_concurrent]
         if max_concurrent not in test_points:
@@ -720,7 +720,7 @@ def main():
 
     # 测试各个点
     for jobs in test_points:
-        print(f"测试并发数: {jobs}", flush=True)
+        print(f"测试并发数: {jobs}", flush=True, file=sys.stderr)
         start_time = time.time()
         rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
         elapsed_time = time.time() - start_time
@@ -729,7 +729,7 @@ def main():
         efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
         test_results[jobs] = (success_count, efficiency)
 
-        print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True)
+        print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True, file=sys.stderr)
 
         # 更新最佳值
         if efficiency > best_efficiency:
@@ -782,7 +782,7 @@ def main():
             fine_test_points = fine_test_points[:5]
 
         for jobs in fine_test_points:
-            print(f"精细化测试并发数: {jobs}", flush=True)
+            print(f"精细化测试并发数: {jobs}", flush=True, file=sys.stderr)
             start_time = time.time()
             rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
             elapsed_time = time.time() - start_time
@@ -791,7 +791,7 @@ def main():
             efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
             test_results[jobs] = (success_count, efficiency)
 
-            print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True)
+            print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True, file=sys.stderr)
 
             # 更新最佳值
             if efficiency > best_efficiency:
@@ -809,7 +809,7 @@ def main():
     for jobs, (success, efficiency) in sorted(test_results.items()):
         print(f"并发数 {jobs}: 成功 {success}, 效率 {efficiency:.2f}/s", flush=True)
 
-    print(f"\n最终使用并发数: {best_jobs}，效率 {best_efficiency:.2f}/s，成功生成 {best_success} 个变体", flush=True)
+    print(f"\n最终使用并发数: {best_jobs}，效率 {best_efficiency:.2f}/s，效率 {best_efficiency:.2f}/s，成功生成 {best_success} 个变体", flush=True)
 
     # 保存找到的最佳并发数
     save_best_jobs(model, best_jobs)
