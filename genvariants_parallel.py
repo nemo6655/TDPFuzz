@@ -3,6 +3,7 @@
 import json
 import random
 import os
+import sys
 from typing import List, Optional, Dict
 from argparse import ArgumentParser
 import requests
@@ -157,6 +158,7 @@ def generate_completion_glm(
     # 增加超时时间并添加重试机制
     max_retries = 3
     timeout = 60  # 增加超时时间到60秒
+    response = None
 
     for attempt in range(max_retries):
         try:
@@ -166,13 +168,28 @@ def generate_completion_glm(
                 json=data,
                 timeout=timeout
             )
-            break  # 如果成功，跳出重试循环
-        except requests.exceptions.ReadTimeout:
+            # 检查响应状态码
+            if response.status_code == 200:
+                break  # 如果成功，跳出重试循环
+            else:
+                print(f"API返回错误状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
+                if attempt < max_retries - 1:
+                    print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                    continue
+                else:
+                    # 最后一次尝试失败，返回错误信息
+                    return {
+                        "error": f"GLM API error after {max_retries} attempts: {response.status_code} - {response.text}"
+                    }
+        except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as e:
             if attempt < max_retries - 1:  # 如果不是最后一次尝试
-                print(f"请求超时，正在重试 ({attempt + 1}/{max_retries})...")
+                print(f"请求异常: {str(e)}, 正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
                 continue
             else:
-                raise  # 如果是最后一次尝试，抛出异常
+                # 最后一次尝试失败，返回错误信息
+                return {
+                    "error": f"GLM API request failed after {max_retries} attempts: {str(e)}"
+                }
 
     if response.status_code == 200:
         result = response.json()
@@ -350,13 +367,19 @@ def generate_variant(i, generators, model, endpoint, filename, args):
     out_path = os.path.join(args.output_dir,out_file)
     meta_file = os.path.join(args.log_dir, out_file + '.json')
 
-    res = generate_completion(
-        prompt,
-        endpoint,
-        model,
-        stop=stop,
-        **vars(args.gen),
-    )
+    try:
+        res = generate_completion(
+            prompt,
+            endpoint,
+            model,
+            stop=stop,
+            **vars(args.gen),
+        )
+    except Exception as e:
+        # 捕获所有异常，防止程序崩溃
+        print(f"生成变体时发生异常: {str(e)}", file=sys.stderr)
+        res = {"error": f"Exception in generate_completion: {str(e)}"}
+
     if 'generated_text' not in res:
         meta = {
             'model': model,
@@ -372,8 +395,11 @@ def generate_variant(i, generators, model, endpoint, filename, args):
         }
 
         # Write (error) metadata to logdir
-        with open(meta_file, 'w') as f:
-            f.write(json.dumps(meta))
+        try:
+            with open(meta_file, 'w') as f:
+                f.write(json.dumps(meta))
+        except Exception as e:
+            print(f"写入错误元数据失败: {str(e)}", file=sys.stderr)
 
         return None
 
@@ -546,10 +572,25 @@ def main():
             future = executor.submit(generate_variant, i, generators, model, endpoint, filename, args)
             # future.add_done_callback(lambda _: pbar.update())
             futures.append(future)
+
+        # 统计成功和失败的任务
+        success_count = 0
+        failure_count = 0
+
         for future in as_completed(futures):
-            res = future.result()
-            if res is not None:
-                print(res, flush=True)
+            try:
+                res = future.result()
+                if res is not None:
+                    print(res, flush=True)
+                    success_count += 1
+                else:
+                    failure_count += 1
+            except Exception as e:
+                print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                failure_count += 1
+
+        # 打印统计信息
+        print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
     # pbar.close()
 
 def on_nsf_access() -> dict[str, str] | None:
