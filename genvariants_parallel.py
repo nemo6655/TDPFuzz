@@ -95,7 +95,9 @@ def generate_completion_tgi(
     }
     if stop is not None:
         data['parameters']['stop'] = stop
-    return requests.post(f'{endpoint}/generate', json=data).json()
+    # 增加超时时间
+    response = requests.post(f'{endpoint}/generate', json=data, timeout=60)
+    return response.json()
 
 def generate_completion_glm(
         prompt,
@@ -143,12 +145,25 @@ def generate_completion_glm(
     if stop is not None:
         data["stop"] = stop
 
-    response = requests.post(
-        endpoint,
-        headers=headers,
-        json=data,
-        timeout=30
-    )
+    # 增加超时时间并添加重试机制
+    max_retries = 3
+    timeout = 60  # 增加超时时间到60秒
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                endpoint,
+                headers=headers,
+                json=data,
+                timeout=timeout
+            )
+            break  # 如果成功，跳出重试循环
+        except requests.exceptions.ReadTimeout:
+            if attempt < max_retries - 1:  # 如果不是最后一次尝试
+                print(f"请求超时，正在重试 ({attempt + 1}/{max_retries})...")
+                continue
+            else:
+                raise  # 如果是最后一次尝试，抛出异常
 
     if response.status_code == 200:
         result = response.json()
