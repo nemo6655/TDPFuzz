@@ -18,6 +18,15 @@ def get_endpoints() -> Dict[str, str]:
             (model, endpoint) = endpoint_pair.split(':', 1)
             result[model] = endpoint
         return result
+
+    # 如果没有环境变量，添加默认的智谱API端点
+    result['glm-4.5-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 最新快速模型
+    result['glm-4-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4-air'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4-airx'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4-long'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-3-turbo'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions' 
     
     # If not in environment, try to get from config file
     try:
@@ -455,9 +464,34 @@ def main():
 
     try:
         access_info = on_nsf_access()
-        endpoint = args.model.endpoints[args.model_name] if access_info is None else access_info['endpoint']
-    except KeyError:
-        print(f'WARNING: no endpoint for model {args.model_name}', file=sys.stderr)
+        if access_info is None:
+            endpoints = get_endpoints()
+            # 优先尝试使用CodeLlama模型
+            if endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
+                endpoint = endpoints['codellama/CodeLlama-13b-hf']
+            # 如果没有CodeLlama，尝试使用最新的智谱模型glm-4.5-flash
+            elif endpoints and endpoints.get('glm-4.5-flash'):
+                endpoint = endpoints['glm-4.5-flash']
+                # 更新模型名称为智谱模型
+                args.model_name = 'glm-4.5-flash'
+            # 如果没有glm-4.5-flash，尝试使用glm-4-flash
+            elif endpoints and endpoints.get('glm-4-flash'):
+                endpoint = endpoints['glm-4-flash']
+                # 更新模型名称为智谱模型
+                args.model_name = 'glm-4-flash'
+            # 如果以上都没有，尝试使用其他智谱模型
+            elif endpoints and any(key.startswith('glm-') for key in endpoints):
+                glm_models = [k for k in endpoints.keys() if k.startswith('glm-')]
+                endpoint = endpoints[glm_models[0]]
+                # 更新模型名称为智谱模型
+                args.model_name = glm_models[0]
+            else:
+                # 如果都没有，抛出错误
+                raise ValueError("No available model endpoints found. Please configure CodeLlama or GLM model endpoints.")
+        else:
+            endpoint = access_info['endpoint']
+    except (KeyError, ValueError) as e:
+        print(f'WARNING: {e}', file=sys.stderr)
         return
 
     info = model_info(args.model_name, endpoint)
@@ -527,16 +561,4 @@ def on_nsf_access() -> dict[str, str] | None:
     }
 
 if __name__ == '__main__':
-    access_info = on_nsf_access()
-    if access_info is None:
-        endpoints = get_endpoints()
-        if endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
-            endpoint = endpoints['codellama/CodeLlama-13b-hf']
-        elif endpoints and endpoints.get('glm-4.5-flash'):  # 暂时不考虑不同glm模型兼容
-            endpoint = endpoints['glm-4.5-flash']
-        else:
-            endpoint = endpoints['codellama/CodeLlama-13b-hf']
-    else:
-        endpoint = access_info['endpoint']
-    print(endpoint)
     main()
