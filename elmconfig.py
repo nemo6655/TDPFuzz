@@ -762,7 +762,7 @@ def defaultconfig_cmd(args):
         k : v for k, v in args.__dict__.items()
         if k.startswith('skip_')
     }
-    full_config = get_config_for_progs(args.progs, config_file=args.config, **options)
+    full_config = get_config_for_progs(args.progs, config_file=str(args.config) if args.config is not None else None, **options)
     if not full_config:
         print("Error: no config options found", file=sys.stderr)
         sys.exit(1)
@@ -808,7 +808,7 @@ def get_cmd(args):
             if isinstance(val, ty):
                 return conv_func(val)
         return val
-    conf_dict = get_config_for_progs(args.progs, config_file=args.config)
+    conf_dict = get_config_for_progs(args.progs, config_file=str(args.config) if args.config is not None else None)
     keys = args.key.split('.')
     try:
         val = mget(conf_dict, keys, Raise)
