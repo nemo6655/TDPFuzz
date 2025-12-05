@@ -311,7 +311,24 @@ def generate_corpus(module_path, input_seeds: str, worker_dir, args):
     module_name = os.path.basename(module_path)
     # Copy the module to the output directory
     copied_module_name = os.path.join(worker_dir, module_name)
-    shutil.copyfile(module_path, copied_module_name)
+
+    # 检查module_path是否有效
+    if not os.path.exists(module_path):
+        print(f"错误: 模块文件不存在: {module_path}", file=sys.stderr)
+        return None
+
+    # 检查module_path是否是一个有效的文件路径
+    if not os.path.isfile(module_path):
+        print(f"错误: 模块路径不是一个文件: {module_path}", file=sys.stderr)
+        return None
+
+    try:
+        shutil.copyfile(module_path, copied_module_name)
+    except Exception as e:
+        print(f"复制文件失败: {str(e)}", file=sys.stderr)
+        print(f"源文件: {module_path}", file=sys.stderr)
+        print(f"目标文件: {copied_module_name}", file=sys.stderr)
+        return None
     actual_module_name = os.path.join(worker_dir, module_name)
     outdir = os.path.join(worker_dir, "output")
     logfile_name = f'logfile.json'
@@ -495,7 +512,16 @@ def main():
     ), file=output_log)
 
     # The first line sent by genvariants is the number of modules it will produce
-    module_count = int(sys.stdin.readline())
+    try:
+        first_line = sys.stdin.readline()
+        # Skip any URL lines that might be in the input
+        while first_line.strip().startswith('http'):
+            first_line = sys.stdin.readline()
+        module_count = int(first_line)
+    except ValueError as e:
+        print(f"Error reading module count: {e}", file=sys.stderr)
+        print(f"Received input: {first_line}", file=sys.stderr)
+        sys.exit(1)
     
     gen: str = args.generation
     resample = get_resample_iterations()

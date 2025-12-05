@@ -1,5 +1,6 @@
 import click
 import os.path
+import re
 import subprocess
 import sys
 import shutil
@@ -37,6 +38,8 @@ def make_build_dir(fuzzbench_dir: str, patch_info: tuple[str, str, str] | None =
          open(os.path.join(project_dir, 'Dockerfile')) as original_dockerfile:
         template = template_file.read().replace('FROM ghcr.io/cychen2021/placeholder', '')
         original = original_dockerfile.read()
+        # Replace gcr.io with gcr.m.daocloud.io to improve access in China
+        original = original.replace('gcr.io/', 'gcr.m.daocloud.io/')
         template = template.replace('#$include_dockerfile$', original)
         template = template.replace('$__PROJECT_DIR', dirmap.project_dir)
         template = template.replace('$__ENTRY_FILE', dirmap.entry_file)

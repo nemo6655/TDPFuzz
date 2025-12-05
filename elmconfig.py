@@ -382,7 +382,7 @@ class ELMFuzzConfig:
     def load_config(self, args: Namespace) -> None:
         # Load config file(s)
         if args.config is not None:
-            conf = self.yaml.load(args.config)
+            conf = self.yaml.load(open(args.config).read())
         else:
             to_merge = [ config_file for config_file in self.config_file_search() if os.path.exists(config_file) ]
             if len(to_merge) == 1:
@@ -735,7 +735,7 @@ class ELMFuzzConfig:
         else:
             return f"ELMFuzzConfig(prog={self.parser.prog}, [not yet parsed])"
 
-def get_config_for_progs(progs: List[str], **kwargs) -> CommentedMap:
+def get_config_for_progs(progs: List[str], config_file=None, **kwargs) -> CommentedMap:
     full_config = None
     for prog in progs:
         module = __import__(prog)
@@ -745,7 +745,10 @@ def get_config_for_progs(progs: List[str], **kwargs) -> CommentedMap:
             parents={prog: parser}
         )
         module.init_parser(config)
-        prog_args = config.parse_args_nofail(['--dump-config'])
+        dump_args = ['--dump-config']
+        if config_file is not None:
+            dump_args.extend(['--config', config_file])
+        prog_args = config.parse_args_nofail(dump_args)
         conf_dict = config.get_config(prog_args, **kwargs)
         if full_config is None:
             full_config = conf_dict
@@ -759,7 +762,7 @@ def defaultconfig_cmd(args):
         k : v for k, v in args.__dict__.items()
         if k.startswith('skip_')
     }
-    full_config = get_config_for_progs(args.progs, **options)
+    full_config = get_config_for_progs(args.progs, config_file=str(args.config) if args.config is not None else None, **options)
     if not full_config:
         print("Error: no config options found", file=sys.stderr)
         sys.exit(1)
@@ -805,7 +808,7 @@ def get_cmd(args):
             if isinstance(val, ty):
                 return conv_func(val)
         return val
-    conf_dict = get_config_for_progs(args.progs)
+    conf_dict = get_config_for_progs(args.progs, config_file=str(args.config) if args.config is not None else None)
     keys = args.key.split('.')
     try:
         val = mget(conf_dict, keys, Raise)
