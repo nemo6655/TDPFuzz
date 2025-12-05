@@ -22,7 +22,8 @@ def get_endpoints() -> Dict[str, str]:
         return result
 
     # 如果没有环境变量，添加默认的智谱API端点
-    result['glm-4.5-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 最新快速模型
+    result['glm-4.6'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 最新模型
+    result['glm-4.5-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 快速模型
     result['glm-4-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
     result['glm-4'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
     result['glm-4-air'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
@@ -561,8 +562,14 @@ def main():
         access_info = on_nsf_access()
         if access_info is None:
             endpoints = get_endpoints()
-            # 优先尝试使用CodeLlama模型
-            if endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
+
+            # 检查用户指定的模型是否在可用端点中
+            user_model = args.model_name
+            if endpoints and endpoints.get(user_model):
+                # 使用用户指定的模型
+                endpoint = endpoints[user_model]
+            # 如果用户指定的模型不在端点中，尝试使用CodeLlama模型
+            elif endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
                 endpoint = endpoints['codellama/CodeLlama-13b-hf']
             # 如果没有CodeLlama，尝试使用最新的智谱模型glm-4.5-flash
             elif endpoints and endpoints.get('glm-4.5-flash'):
