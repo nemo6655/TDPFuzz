@@ -121,20 +121,21 @@ def generate_completion_tgi(
     response = requests.post(f'{endpoint}/generate', json=data, timeout=60)
     return response.json()
 
-def generate_completion_glm(
-        prompt,
-        endpoint,
-        model_name,
-        temperature=0.2,
-        max_new_tokens=1200,
-        repetition_penalty=1.1,
-        stop=None
-):
-    """Generate a completion of the prompt using GLM API."""
+# 全局变量用于缓存API密钥，避免重复读取
+_cached_glm_api_key = None
+
+def get_glm_api_key():
+    """获取GLM API密钥，使用全局缓存避免重复读取"""
+    global _cached_glm_api_key
+
+    # 如果已经缓存，直接返回
+    if _cached_glm_api_key:
+        return _cached_glm_api_key
+
     # 首先尝试从环境变量获取
     glm_api_key = os.getenv('GLM_API_KEY')
 
-    # 如果环境变量不存在，尝试从配置文件读取，与Hugging Face token的处理方式一致
+    # 如果环境变量不存在，尝试从配置文件读取
     if not glm_api_key:
         token_paths = [
             "/home/appuser/.config/glm/token",  # 容器内appuser配置
@@ -150,93 +151,121 @@ def generate_completion_glm(
     if not glm_api_key:
         raise ValueError("GLM API Key not found in environment variables or config files")
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {glm_api_key}"
-    }
+    # 缓存API密钥
+    _cached_glm_api_key = glm_api_key
+    return glm_api_key
 
-    data = {
-        "model": model_name,
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": temperature,
-        "max_tokens": max_new_tokens,
-    }
+def generate_completion_glm(
+        prompt,
+        endpoint,
+        model_name,
+        temperature=0.2,
+        max_new_tokens=1200,
+        repetition_penalty=1.1,
+        stop=None
+):
+    """Generate a completion of the prompt using GLM API."""
+    try:
+        # 获取API密钥
+        glm_api_key = get_glm_api_key()
 
-    if stop is not None:
-        data["stop"] = stop
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {glm_api_key}"
+        }
 
-    # 增加超时时间并添加重试机制
-    max_retries = 3
-    timeout = 60  # 增加超时时间到60秒
-    response = None
+        # 优化数据结构，减少不必要的字段
+        data = {
+            "model": model_name,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_new_tokens,
+        }
 
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(
-                endpoint,
-                headers=headers,
-                json=data,
-                timeout=timeout
-            )
-            # 检查响应状态码
-            if response.status_code == 200:
-                break  # 如果成功，跳出重试循环
-            elif response.status_code == 429:
-                # 遇到429错误，增加延迟
-                retry_delay = min(30, 5 * (attempt + 1))  # 递增延迟，最多30秒
-                print(f"API并发限制 (429)，等待 {retry_delay} 秒后重试...", file=sys.stderr)
-                time.sleep(retry_delay)
-                if attempt < max_retries - 1:
-                    print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+        # 只有在必要时才添加stop参数
+        if stop is not None:
+            data["stop"] = stop
+
+        # 优化重试机制，使用指数退避策略
+        max_retries = 3
+        base_delay = 1  # 基础延迟时间（秒）
+        timeout = 60    # 超时时间
+        response = None
+
+        for attempt in range(max_retries):
+            try:
+                # 发送请求
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json=data,
+                    timeout=timeout
+                )
+
+                # 检查响应状态码
+                if response.status_code == 200:
+                    # 解析响应
+                    result = response.json()
+                    # 转换为与TGI兼容的格式
+                    if "choices" in result and len(result["choices"]) > 0:
+                        return {
+                            "generated_text": result["choices"][0]["message"]["content"],
+                            "details": {
+                                "finish_reason": result["choices"][0].get("finish_reason", "unknown")
+                            }
+                        }
+                elif response.status_code == 429:
+                    # 遇到429错误，使用指数退避策略
+                    delay = min(30, base_delay * (2 ** attempt))  # 指数增长，最多30秒
+                    print(f"API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
+                    time.sleep(delay)
+                    if attempt < max_retries - 1:
+                        print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                        continue
+                    else:
+                        # 最后一次尝试失败，返回错误信息
+                        return {
+                            "error": f"GLM API rate limit error after {max_retries} attempts: {response.status_code} - {response.text}"
+                        }
+                else:
+                    print(f"API返回错误状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
+                    if attempt < max_retries - 1:
+                        print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                        continue
+                    else:
+                        # 最后一次尝试失败，返回错误信息
+                        return {
+                            "error": f"GLM API error after {max_retries} attempts: {response.status_code} - {response.text}"
+                        }
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as e:
+                if attempt < max_retries - 1:  # 如果不是最后一次尝试
+                    delay = min(30, base_delay * (2 ** attempt))  # 指数退避
+                    print(f"请求异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                    time.sleep(delay)
                     continue
                 else:
                     # 最后一次尝试失败，返回错误信息
                     return {
-                        "error": f"GLM API rate limit error after {max_retries} attempts: {response.status_code} - {response.text}"
+                        "error": f"GLM API request failed after {max_retries} attempts: {str(e)}"
                     }
-            else:
-                print(f"API返回错误状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
-                if attempt < max_retries - 1:
-                    print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
-                    continue
-                else:
-                    # 最后一次尝试失败，返回错误信息
-                    return {
-                        "error": f"GLM API error after {max_retries} attempts: {response.status_code} - {response.text}"
-                    }
-        except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as e:
-            if attempt < max_retries - 1:  # 如果不是最后一次尝试
-                print(f"请求异常: {str(e)}, 正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
-                continue
-            else:
-                # 最后一次尝试失败，返回错误信息
-                return {
-                    "error": f"GLM API request failed after {max_retries} attempts: {str(e)}"
-                }
 
-    if response.status_code == 200:
-        result = response.json()
-        # 转换为与TGI兼容的格式
-        if "choices" in result and len(result["choices"]) > 0:
-            return {
-                "generated_text": result["choices"][0]["message"]["content"],
-                "details": {
-                    "finish_reason": result["choices"][0].get("finish_reason", "unknown")
-                }
-            }
+        # 如果所有重试都失败，返回错误信息
+        error_msg = f"GLM API error: {response.status_code} - {response.text}"
 
-    # 如果出错，返回错误信息
-    error_msg = f"GLM API error: {response.status_code} - {response.text}"
+        # 检查是否是429错误（并发限制）
+        if response and response.status_code == 429:
+            print(f"API并发限制错误 (429): {response.text}", file=sys.stderr)
 
-    # 检查是否是429错误（并发限制）
-    if response.status_code == 429:
-        print(f"API并发限制错误 (429): {response.text}", file=sys.stderr)
-
-    return {
-        "error": error_msg
-    }
+        return {
+            "error": error_msg
+        }
+    except Exception as e:
+        # 捕获所有其他异常
+        return {
+            "error": f"GLM API call failed: {str(e)}"
+        }
 
 def infilling_prompt_llama(
     pre: str,
@@ -398,13 +427,43 @@ def generate_variant(i, generators, model, endpoint, filename, args):
     out_path = os.path.join(args.output_dir,out_file)
     meta_file = os.path.join(args.log_dir, out_file + '.json')
 
+    # 对于GLM模型，优化提示以提高生成代码质量
+    optimized_prompt = prompt
+    if model and model.startswith('glm-'):
+        # 为GLM模型添加更明确的指令
+        if generator == 'infilled':
+            optimized_prompt = f"""请完成以下Python代码，确保语法正确且功能完整。注意保持代码风格一致。
+
+{prompt}
+
+请只提供填充的代码部分，不要重复前缀和后缀。"""
+        elif generator == 'complete':
+            optimized_prompt = f"""请继续完成以下Python代码，确保语法正确且逻辑连贯。
+
+{prompt}
+
+请只提供继续的代码部分，不要重复已有内容。"""
+        elif generator == 'lmsplice':
+            optimized_prompt = f"""请完成以下Python代码片段，确保语法正确且逻辑连贯。
+
+{prompt}
+
+请只提供填充的代码部分，不要重复前缀和后缀。"""
+
+    # 设置更低的温度以提高代码质量
+    gen_params = vars(args.gen).copy()
+    if model and model.startswith('glm-'):
+        # GLM模型使用较低的温度，提高代码质量
+        if 'temperature' in gen_params and gen_params['temperature'] > 0.2:
+            gen_params['temperature'] = 0.2
+
     try:
         res = generate_completion(
-            prompt,
+            optimized_prompt,
             endpoint,
             model,
             stop=stop,
-            **vars(args.gen),
+            **gen_params,
         )
     except Exception as e:
         # 捕获所有异常，防止程序崩溃
@@ -414,7 +473,7 @@ def generate_variant(i, generators, model, endpoint, filename, args):
     if 'generated_text' not in res:
         meta = {
             'model': model,
-            'prompt': prompt,
+            'prompt': optimized_prompt,
             'generator': generator,
             'prompt_lines': plines,
             'orig_lines': olines,
@@ -444,6 +503,23 @@ def generate_variant(i, generators, model, endpoint, filename, args):
         for stop_seq in stop:
             if text.endswith(stop_seq):
                 text = text[:-len(stop_seq)]
+
+    # 对于GLM模型，进行额外的后处理
+    if model and model.startswith('glm-'):
+        # 移除可能的markdown代码块标记
+        if text.startswith('```python'):
+            text = text[9:]
+        if text.endswith('```'):
+            text = text[:-3]
+        # 移除可能的解释性文本
+        lines = text.split('\n')
+        code_lines = []
+        for line in lines:
+            # 跳过明显的解释行
+            if not line.strip().startswith('#') or line.strip() == '#':
+                code_lines.append(line)
+        text = '\n'.join(code_lines)
+
     gen_lines = text.count('\n')
 
     # one of [length, eos_token, stop_sequence]
@@ -455,7 +531,7 @@ def generate_variant(i, generators, model, endpoint, filename, args):
     }[finish_reason]
     meta = {
         'model': model,
-        'prompt': prompt,
+        'prompt': optimized_prompt,
         'generator': generator,
         'prompt_lines': plines,
         'orig_lines': olines,
@@ -1039,13 +1115,27 @@ def complete_incomplete_function(code: str) -> Optional[str]:
         return None
 
 def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
-    """尝试修复常见的Python语法错误"""
+    """尝试修复常见的Python语法错误，如果无法修复则使用GLM模型进行智能纠错"""
+    try:
+        # 首先尝试简单的规则修复
+        simple_fix = simple_syntax_fix(code, error)
+        if simple_fix:
+            return simple_fix
+
+        # 如果简单修复失败，尝试使用GLM模型进行智能纠错
+        return ai_syntax_fix(code, error)
+    except Exception as e:
+        print(f"修复语法错误时发生异常: {e}", file=sys.stderr)
+        return None
+
+def simple_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
+    """使用规则修复简单的语法错误"""
     try:
         # 获取错误位置
         error_line = error.lineno
         error_offset = error.offset
 
-        lines = code.split('')
+        lines = code.split('\n')
         if error_line <= len(lines):
             error_line_content = lines[error_line - 1]
 
@@ -1059,7 +1149,7 @@ def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
                     # 移除多余的右括号
                     fixed_line = error_line_content[:error_offset-1] + error_line_content[error_offset:]
                     lines[error_line - 1] = fixed_line.replace('))', ')')
-                    return ''.join(lines)
+                    return '\n'.join(lines)
 
             # 2. 修复缩进错误
             if "unexpected indent" in str(error) or "unindent does not match" in str(error):
@@ -1076,7 +1166,7 @@ def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
                             fixed_lines.append('')
                     else:
                         fixed_lines.append(line)
-                return ''.join(fixed_lines)
+                return '\n'.join(fixed_lines)
 
             # 3. 修复未闭合的字符串
             if "EOL while scanning string literal" in str(error):
@@ -1087,7 +1177,7 @@ def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
                         lines[error_line - 1] = line + "'"
                     elif '"' in line and not line.count('"') % 2 == 0:
                         lines[error_line - 1] = line + '"'
-                    return ''.join(lines)
+                    return '\n'.join(lines)
 
             # 4. 修复缺失的冒号
             if "expected ':'" in str(error):
@@ -1096,12 +1186,88 @@ def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
                     # 在行末添加冒号（如果没有）
                     if not line.rstrip().endswith(':'):
                         lines[error_line - 1] = line.rstrip() + ':'
-                        return ''.join(lines)
+                        return '\n'.join(lines)
 
         # 如果无法自动修复，返回None
         return None
     except Exception as e:
-        print(f"修复语法错误时发生异常: {e}", file=sys.stderr)
+        print(f"简单语法修复时发生异常: {e}", file=sys.stderr)
+        return None
+
+def ai_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
+    """使用GLM模型进行智能语法纠错"""
+    try:
+        # 获取端点信息
+        endpoints = get_endpoints()
+        if not endpoints:
+            print("无法获取API端点信息，跳过AI语法修复", file=sys.stderr)
+            return None
+
+        # 使用可用的GLM模型，优先使用性能更好的模型
+        model_name = None
+        endpoint = None
+        for model in ['glm-4.6', 'glm-4.5-flash', 'glm-4-flash', 'glm-4', 'glm-3-turbo']:
+            if model in endpoints:
+                model_name = model
+                endpoint = endpoints[model]
+                break
+
+        if not model_name or not endpoint:
+            print("没有可用的GLM模型，跳过AI语法修复", file=sys.stderr)
+            return None
+
+        # 构建纠错提示，使用更明确的指令
+        error_msg = str(error)
+        prompt = f"""请修复以下Python代码中的语法错误。
+
+错误信息: {error_msg}
+
+```python
+{code}
+```
+
+要求:
+1. 只返回修复后的完整代码，不要包含任何解释或其他文本
+2. 确保修复后的代码是有效的Python代码，没有语法错误
+3. 保持代码的原始功能和逻辑不变，只修复语法问题
+4. 不要添加markdown代码块标记（如```python和```）"""
+
+        # 调用GLM API进行语法纠错，使用优化后的参数
+        response = generate_completion_glm(
+            prompt=prompt,
+            endpoint=endpoint,
+            model_name=model_name,
+            temperature=0.1,  # 使用较低的温度，确保更稳定的输出
+            max_new_tokens=2048
+        )
+
+        if 'generated_text' in response:
+            fixed_code = response['generated_text'].strip()
+
+            # 尝试提取代码块中的代码（以防模型添加了markdown标记）
+            if '```python' in fixed_code and '```' in fixed_code:
+                try:
+                    start = fixed_code.index('```python') + 9
+                    end = fixed_code.rindex('```')
+                    fixed_code = fixed_code[start:end].strip()
+                except Exception:
+                    pass
+
+            # 验证修复后的代码语法是否正确
+            try:
+                compile(fixed_code, '<string>', 'exec')
+                print("使用GLM模型成功修复语法错误", file=sys.stderr)
+                return fixed_code
+            except SyntaxError as e:
+                print(f"GLM模型修复后的代码仍有语法错误: {e}", file=sys.stderr)
+                # 如果仍然有语法错误，尝试再次修复
+                return None
+        else:
+            print(f"GLM API返回错误: {response}", file=sys.stderr)
+            return None
+
+    except Exception as e:
+        print(f"AI语法修复时发生异常: {e}", file=sys.stderr)
         return None
 
 def load_best_jobs(model: str) -> Optional[int]:
