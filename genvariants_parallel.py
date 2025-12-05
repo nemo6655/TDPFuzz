@@ -5,10 +5,20 @@ import random
 import os
 import sys
 import time
+import signal
 from typing import List, Optional, Dict
 from argparse import ArgumentParser
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# 全局变量，用于跟踪中断状态
+interrupted = False
+
+def signal_handler(sig, frame):
+    """处理Ctrl+C中断信号"""
+    global interrupted
+    print("\n\n收到中断信号，正在停止程序...", file=sys.stderr)
+    interrupted = True
 
 def get_endpoints() -> Dict[str, str]:
     result = dict()
@@ -551,9 +561,13 @@ def init_parser(elm):
     elm.subgroup_help['gen'] = 'Generation parameters'
 
 def main():
-    global infilling_prompt
+    global infilling_prompt, interrupted
     import sys
     from elmconfig import ELMFuzzConfig
+    
+    # 注册信号处理器，用于处理Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+    
     config = ELMFuzzConfig(parents={'genvariants_parallel': make_parser()})
     init_parser(config)
     args = config.parse_args()
@@ -669,6 +683,7 @@ def main():
     # 尝试使用当前并发数执行任务
     def try_with_jobs(jobs):
         nonlocal worklist, generators, model, endpoint, args
+        global interrupted
 
         print(f"尝试使用并发数: {jobs}", flush=True, file=sys.stderr)
         with ThreadPoolExecutor(max_workers=jobs) as executor:
@@ -687,6 +702,12 @@ def main():
             check_threshold = min(jobs, len(futures))  # 检查至少等于并发数的任务
 
             for future in as_completed(futures):
+                # 检查是否收到中断信号
+                if interrupted:
+                    print("收到中断信号，正在停止任务...", file=sys.stderr)
+                    executor.shutdown(wait=False)
+                    return True, success_count, failure_count
+                    
                 try:
                     res = future.result()
                     if res is not None:
@@ -714,6 +735,12 @@ def main():
             # 如果没有遇到429错误，等待所有任务完成
             if not rate_limit_hit:
                 for future in futures:
+                    # 检查是否收到中断信号
+                    if interrupted:
+                        print("收到中断信号，正在停止任务...", file=sys.stderr)
+                        executor.shutdown(wait=False)
+                        return True, success_count, failure_count
+                        
                     if not future.done():
                         try:
                             res = future.result()
@@ -776,6 +803,11 @@ def main():
 
     # 测试各个点
     for jobs in test_points:
+        # 检查是否收到中断信号
+        if interrupted:
+            print("收到中断信号，正在停止测试...", file=sys.stderr)
+            break
+            
         print(f"测试并发数: {jobs}", flush=True, file=sys.stderr)
         start_time = time.time()
         rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
@@ -838,6 +870,11 @@ def main():
             fine_test_points = fine_test_points[:5]
 
         for jobs in fine_test_points:
+            # 检查是否收到中断信号
+            if interrupted:
+                print("收到中断信号，正在停止精细化测试...", file=sys.stderr)
+                break
+                
             print(f"精细化测试并发数: {jobs}", flush=True, file=sys.stderr)
             start_time = time.time()
             rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
@@ -871,7 +908,7 @@ def main():
     save_best_jobs(model, best_jobs)
 
     # 使用最佳并发数重新运行所有任务（如果之前的尝试被中断）
-    if best_jobs < args.jobs:
+    if best_jobs < args.jobs and not interrupted:
         print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
         try_with_jobs(best_jobs)
 
