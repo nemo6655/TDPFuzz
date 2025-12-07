@@ -104,7 +104,7 @@ else
 
         python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
        
-        python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen
+        python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --noss
         # python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file | \
         #     while read cov gen model generator ; do
         #         echo "Selecting $generator from $gen/$model with $cov edges covered"
@@ -190,12 +190,6 @@ case "$TYPE" in
         python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
         ;;
 esac
-
-
-# for model_name in $MODELS ; do
-#     GOOUT=$(./elmconfig.py get run.genoutput_dir -s MODEL=${MODEL} -s GEN=${next_gen})
-#     rm -rf "$GOOUT"
-# done
 
 # Plot coverage
 python analyze_cov.py -m $num_gens -p "$ELMFUZZ_RUNDIR"/*/logs/coverage.json

@@ -160,29 +160,37 @@ def ilp_set_cover(set_family: list[tuple[str, set[str], int]], baseline: set[str
         print("ILP failed to find a solution. Returning original set.", file=sys.stderr)
         return set_family
 
-def extract_state_pseudo_edges(filename: str) -> set[str]:
+def get_transitions_from_state_string(state_str: str) -> set[str]:
     pseudo_edges = set()
+    if not state_str or state_str == "unknown":
+        return pseudo_edges
+    
+    try:
+        if 'end-at-' in state_str:
+            state_str = state_str.split('end-at-', 1)[0]
+            if state_str.endswith('-'):
+                state_str = state_str[:-1]
+        
+        states = state_str.split('-')
+        # Filter out empty strings and non-numeric states
+        states = [s for s in states if s.isdigit()]
+        
+        if len(states) >= 2:
+            for i in range(len(states) - 1):
+                pseudo_edges.add(f"__TRANS_{states[i]}_{states[i+1]}__")
+    except Exception:
+        pass
+    return pseudo_edges
+
+def extract_state_pseudo_edges(filename: str) -> set[str]:
+    # Legacy support for filename-based extraction
     if ':state:' in filename:
         try:
             state_part = filename.split(':state:', 1)[1]
-            if 'end-at-' in state_part:
-                state_part = state_part.split('end-at-', 1)[0]
-                if state_part.endswith('-'):
-                    state_part = state_part[:-1]
-            
-            states = state_part.split('-')
-            # Filter out empty strings and non-numeric states
-            states = [s for s in states if s.isdigit()]
-            
-            if len(states) >= 2:
-                for i in range(len(states) - 1):
-                    pseudo_edges.add(f"__TRANS_{states[i]}_{states[i+1]}__")
-            
-            # for s in states:
-            #     pseudo_edges.add(f"__STATE_{s}__")
+            return get_transitions_from_state_string(state_part)
         except Exception:
             pass
-    return pseudo_edges
+    return set()
 
 @click.command()
 @click.option('--generation', '-g', type=str)
@@ -227,8 +235,26 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
                 for state, files in states.items():
                     if state not in coverage:
                         coverage[state] = {}
-                    for filename, edges_list in files.items():
-                        edge_set = set(map(lambda x: x.split(':')[0], edges_list))
+                    for filename, val in files.items():
+                        edge_set = set()
+                        state_str = "unknown"
+                        
+                        if isinstance(val, dict):
+                            # New format: {"state_str": [edges]}
+                            for s, e in val.items():
+                                state_str = s
+                                edge_set.update(map(lambda x: x.split(':')[0], e))
+                        elif isinstance(val, list):
+                            # Old format: [edges]
+                            edge_set.update(map(lambda x: x.split(':')[0], val))
+                        
+                        # Add pseudo edges from state string
+                        edge_set.update(get_transitions_from_state_string(state_str))
+                        
+                        # Fallback to filename if state_str is unknown
+                        if state_str == "unknown":
+                            edge_set.update(extract_state_pseudo_edges(filename))
+                            
                         coverage[state][filename] = edge_set
         else:
             for full_key, edges_list in coverage_raw.items():
@@ -305,8 +331,8 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
     
     for state, seeds in coverage.items():
         for descendant_key, descendant_edges_raw in seeds.items():
-            state_edges = extract_state_pseudo_edges(descendant_key)
-            descendant_edges = frozenset(set(descendant_edges_raw).union(state_edges))
+            # Edges already include pseudo-edges from loading phase
+            descendant_edges = frozenset(descendant_edges_raw)
             
             if ':state:' in descendant_key:
                 real_filename = descendant_key.split(':state:', 1)[0]
@@ -619,6 +645,24 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
         
         base_edges_set = base_edges if baseline is not None else set()
         ilp_selected = ilp_set_cover(candidates, base_edges_set)
+        
+        # Hybrid Strategy: Fill up to max_elites
+        if len(ilp_selected) < max_elites:
+            print(f"ILP selected {len(ilp_selected)} seeds. Filling up to {max_elites}...", file=sys.stderr)
+            selected_keys = set(k for k, _, _ in ilp_selected)
+            
+            # Sort remaining candidates by coverage size (descending)
+            remaining = []
+            for key, edges, size in candidates:
+                if key not in selected_keys:
+                    remaining.append((key, edges, size))
+            
+            remaining.sort(key=lambda x: len(x[1]), reverse=True)
+            
+            # Add top remaining seeds
+            num_to_add = max_elites - len(ilp_selected)
+            for i in range(min(num_to_add, len(remaining))):
+                ilp_selected.append(remaining[i])
         
         new_elites = {}
         for key, edges, size in ilp_selected:

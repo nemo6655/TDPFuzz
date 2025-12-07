@@ -115,7 +115,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                     '-v', f'{run_tmp}:/tmp',
                     image,
                     '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 5'
-                    #'/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(3 if next_gen > 5 else next_gen + 1) * 3600} 5'
+                    # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(3 if next_gen > 5 else next_gen + 1) * 3600} 5'
                 ]
                 # start and return container id and run_tmp
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -213,8 +213,21 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                             all_cov_data[str(next_gen)][safe_job] = {}
 
                         for k, v in job_cov.items():
-                            edges_only = [item.split(':')[0] for item in v]
-                            all_cov_data[str(next_gen)][safe_job][k] = edges_only
+                            edges_only = []
+                            state_info = "unknown"
+                            for item in v:
+                                if '::::' in item:
+                                    # Extract state info
+                                    try:
+                                        state_info = item.split("state:", 1)[1].split("::::", 1)[0]
+                                    except IndexError:
+                                        pass
+                                    continue
+                                edges_only.append(item.split(':')[0])
+                            
+                            # Structure: gen -> job -> seed -> state_info -> edges
+                            # Note: This changes the structure from seed -> edges to seed -> {state_info: edges}
+                            all_cov_data[str(next_gen)][safe_job][k] = {state_info: edges_only}
 
                     except Exception as e:
                         print(f"Warning: failed to extract/process files from {aflout_path}: {e}")

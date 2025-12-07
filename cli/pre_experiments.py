@@ -261,21 +261,21 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
         subprocess.run(" ".join(cmd), check=True, shell=True, user=USER, cwd=PROJECT_ROOT, stdout=sys.stdout, stderr=sys.stderr)
 
         match target:
-            case "elfuzz":
-                target_cap = "elfuzz"
-                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "elmfuzzers")
-            case "elfuzz_nofs":
-                target_cap = "elfuzz_noFS"
-                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "alt_elmfuzzers")
-            case "elfuzz_nocp":
-                target_cap = "elfuzz_noCompletion"
-                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nocomp_fuzzers")
-            case "elfuzz_noin":
-                target_cap = "elfuzz_noInfilling"
-                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "noinf_fuzzers")
-            case "elfuzz_nosp":
-                target_cap = "elfuzz_noSpl"
-                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nospl_fuzzers")
+            case "tdpfuzzer":
+                target_cap = "tdpfuzzer"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "tdpfuzzers")
+            # case "elfuzz_nofs":
+            #     target_cap = "elfuzz_noFS"
+            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "alt_elmfuzzers")
+            # case "elfuzz_nocp":
+            #     target_cap = "elfuzz_noCompletion"
+            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nocomp_fuzzers")
+            # case "elfuzz_noin":
+            #     target_cap = "elfuzz_noInfilling"
+            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "noinf_fuzzers")
+            # case "elfuzz_nosp":
+            #     target_cap = "elfuzz_noSpl"
+            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nospl_fuzzers")
 
         evolution_record_dir = os.path.join(PROJECT_ROOT, "extradata", "evolution_record", target_cap)
         if not os.path.exists(evolution_record_dir):
@@ -296,15 +296,17 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
             result_name = f"{benchmark}_{datesuffix}.fuzzers"
             tmpdir = os.path.join(tmpdir_raw, result_name)
             os.makedirs(tmpdir, exist_ok=True)
-            result_dir = os.path.join(PROJECT_ROOT, rundir, f"gen{evolution_iterations}", "seeds")
-            for file in os.listdir(result_dir):
-                shutil.copy(os.path.join(result_dir, file), tmpdir)
+            rundir_path = os.path.join(PROJECT_ROOT, rundir)
+            for folder in os.listdir(rundir_path):
+                if folder.startswith("gen") or folder == "stamps" or folder == "initial":
+                    shutil.copytree(os.path.join(rundir_path, folder), os.path.join(tmpdir, folder))
             tar_result_cmd = ["tar", "-cJf", os.path.join(fuzzer_dir, f"{result_name}.tar.xz"), "-C", tmpdir_raw, result_name]
             subprocess.run(tar_result_cmd, check=True, cwd=PROJECT_ROOT)
 
         click.echo(f"Fuzzer synthesized for {benchmark} by {target}")
     finally:
-        subprocess.run(["sudo", "docker", "stop", "tgi-server"], check=True, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # subprocess.run(["sudo", "docker", "stop", "tgi-server"], check=True, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        pass
 
 def produce_glade(benchmark, timelimit: int=600):
     glade_gram_dir = os.path.join(PROJECT_ROOT, "evaluation", "gramgen", benchmark)

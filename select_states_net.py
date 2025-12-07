@@ -23,24 +23,31 @@ def get_state_pools():
         print(f"Error getting state pools: {e}", file=sys.stderr)
         return []
 
-def find_seed_path(base_dir, seed_prefix):
+def get_seed_map(base_dir):
     """
-    Finds a file in base_dir (or base_dir/queue) that starts with seed_prefix.
+    Returns a dictionary mapping seed prefixes (e.g., id:000001) to full paths.
+    Scans both base_dir and base_dir/queue.
     """
-    # Check direct directory
-    if os.path.exists(base_dir):
-        for f in os.listdir(base_dir):
-            if f.startswith(seed_prefix):
-                return os.path.join(base_dir, f)
+    seed_map = {}
     
-    # Check queue directory
+    dirs_to_check = [base_dir]
     queue_dir = os.path.join(base_dir, 'queue')
     if os.path.exists(queue_dir):
-        for f in os.listdir(queue_dir):
-            if f.startswith(seed_prefix):
-                return os.path.join(queue_dir, f)
-                
-    return None
+        dirs_to_check.append(queue_dir)
+        
+    for d in dirs_to_check:
+        if os.path.exists(d):
+            try:
+                for f in os.listdir(d):
+                    full_path = os.path.join(d, f)
+                    if os.path.isfile(full_path):
+                        # prefix is usually id:xxxxxx
+                        prefix = f.split(',')[0]
+                        # If duplicate prefixes exist, last one wins (should be fine for this purpose)
+                        seed_map[prefix] = full_path
+            except OSError:
+                pass
+    return seed_map
 
 def get_transitions(state_str):
     """
@@ -67,28 +74,21 @@ def get_transitions(state_str):
     
     return transitions
 
-def extract_state_string(filename):
+def resolve_gen_dir(elmfuzz_rundir, gen_name):
     """
-    Extracts the state string from a filename key.
-    Format: seed_name:state:transition_info
+    Resolves the directory name for a generation (e.g., '1' -> 'gen1' or '1').
     """
-    if ':state:' in filename:
-        try:
-            return filename.split(':state:')[1]
-        except IndexError:
-            return None
-    return None
+    if os.path.exists(os.path.join(elmfuzz_rundir, gen_name)):
+        return gen_name
+    
+    if not gen_name.startswith('gen'):
+        candidate = 'gen' + gen_name
+        if os.path.exists(os.path.join(elmfuzz_rundir, candidate)):
+            return candidate
+            
+    return gen_name # Default fallback
 
-@click.command()
-@click.option('--cov_file', '-c', type=click.Path(exists=True), required=True, help='Previous generation coverage file')
-@click.option('--elites_file', '-e', type=click.Path(exists=True), required=True, help='Current generation elite seeds file')
-@click.option('--gen', '-g', type=str, required=True, help='Next generation name')
-def main(cov_file, elites_file, gen):
-    elmfuzz_rundir = os.environ.get('ELMFUZZ_RUNDIR')
-    if not elmfuzz_rundir:
-        print("Error: ELMFuzz_RUNDIR environment variable not set.", file=sys.stderr)
-        sys.exit(1)
-
+def select_states_noss(cov_file, elites_file, gen, elmfuzz_rundir):
     print(f"Loading coverage file: {cov_file}")
     with open(cov_file, 'r') as f:
         cov_data = json.load(f)
@@ -96,6 +96,16 @@ def main(cov_file, elites_file, gen):
     print(f"Loading elites file: {elites_file}")
     with open(elites_file, 'r') as f:
         elites_data = json.load(f)
+
+    # Cache for seed maps: (gen_dir_name, pool) -> seed_map
+    seed_map_cache = {} 
+
+    def get_cached_seed_path(gen_dir, pool, seed_prefix):
+        key = (gen_dir, pool)
+        if key not in seed_map_cache:
+             base_dir = os.path.join(elmfuzz_rundir, gen_dir, 'aflnetout', pool)
+             seed_map_cache[key] = get_seed_map(base_dir)
+        return seed_map_cache[key].get(seed_prefix)
 
     # 1. Copy Elite Seeds to 0000
     dest_0000 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0000')
@@ -105,13 +115,7 @@ def main(cov_file, elites_file, gen):
 
     # elites_data structure: prev_gen -> state_pool -> filename -> edges
     for prev_gen, states in elites_data.items():
-        # Normalize generation name to match directory structure
-        gen_dir_name = prev_gen
-        if not os.path.exists(os.path.join(elmfuzz_rundir, gen_dir_name)):
-            if not gen_dir_name.startswith('gen'):
-                candidate = 'gen' + gen_dir_name
-                if os.path.exists(os.path.join(elmfuzz_rundir, candidate)):
-                    gen_dir_name = candidate
+        gen_dir_name = resolve_gen_dir(elmfuzz_rundir, prev_gen)
 
         for state_pool, files in states.items():
             for filename_key in files.keys():
@@ -121,14 +125,9 @@ def main(cov_file, elites_file, gen):
                 else:
                     seed_name_full = filename_key
                 
-                # Extract ID for fuzzy search
-                # seed_name_full usually looks like "id:000317,src:..."
-                # We want "id:000317"
                 seed_id_prefix = seed_name_full.split(',')[0]
                 
-                # Source path construction
-                base_dir = os.path.join(elmfuzz_rundir, gen_dir_name, 'aflnetout', state_pool)
-                src_path = find_seed_path(base_dir, seed_id_prefix)
+                src_path = get_cached_seed_path(gen_dir_name, state_pool, seed_id_prefix)
                 
                 if src_path:
                     shutil.copy(src_path, dest_0000)
@@ -142,51 +141,57 @@ def main(cov_file, elites_file, gen):
     dest_0001 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0001')
     os.makedirs(dest_0001, exist_ok=True)
 
+    # Calculate generation string for JSON lookup (e.g., gen2 -> 1)
+    try:
+        gen_num = int(gen.replace('gen', '')) - 1
+        gen_str = str(gen_num)
+    except ValueError:
+        print(f"Error: Could not parse generation number from {gen}", file=sys.stderr)
+        sys.exit(1)
+
     # Collect covered transitions from elites
     covered_transitions = set()
-    for prev_gen, states in elites_data.items():
-        for state_pool, files in states.items():
-            for filename_key in files.keys():
-                st_str = extract_state_string(filename_key)
-                if st_str:
-                    covered_transitions.update(get_transitions(st_str))
+    if gen_str in elites_data:
+        for state, seeds in elites_data[gen_str].items():
+            for seed_name, val in seeds.items():
+                edges = []
+                if isinstance(val, list) and len(val) == 2:
+                    edges = val[0]
+                elif isinstance(val, dict) and 'edges' in val:
+                    edges = val['edges']
+                
+                for e in edges:
+                    if isinstance(e, str) and e.startswith('__TRANS_'):
+                        covered_transitions.add(e)
 
-    # Collect all transitions and map to seeds from coverage file
+    # Extract all transitions from coverage and map them to seeds
     all_transitions = set()
-    transition_to_seeds = {} # (src, dst) -> list of src_path
+    transition_to_seeds = {} # Map transition -> list of seed paths
 
-    for prev_gen, states in cov_data.items():
-        # Normalize generation name to match directory structure
-        gen_dir_name = prev_gen
-        if not os.path.exists(os.path.join(elmfuzz_rundir, gen_dir_name)):
-            if not gen_dir_name.startswith('gen'):
-                candidate = 'gen' + gen_dir_name
-                if os.path.exists(os.path.join(elmfuzz_rundir, candidate)):
-                    gen_dir_name = candidate
-
-        for state_pool, files in states.items():
-            for filename_key in files.keys():
-                st_str = extract_state_string(filename_key)
-                if st_str:
-                    trans = get_transitions(st_str)
-                    
-                    if ':state:' in filename_key:
-                        seed_name_full = filename_key.split(':state:')[0]
-                    else:
-                        seed_name_full = filename_key
-                        
-                    seed_id_prefix = seed_name_full.split(',')[0]
-                    
-                    # Find path
-                    base_dir = os.path.join(elmfuzz_rundir, gen_dir_name, 'aflnetout', state_pool)
-                    src_path = find_seed_path(base_dir, seed_id_prefix)
+    if gen_str in cov_data:
+        gen_dir_name = resolve_gen_dir(elmfuzz_rundir, gen_str)
+        
+        for job, seeds in cov_data[gen_str].items():
+            for seed_name, state_data in seeds.items():
+                if isinstance(state_data, dict):
+                    # Resolve seed path once per seed
+                    seed_id_prefix = seed_name.split(',')[0]
+                    src_path = get_cached_seed_path(gen_dir_name, job, seed_id_prefix)
                     
                     if src_path:
-                        for t in trans:
-                            all_transitions.add(t)
-                            if t not in transition_to_seeds:
-                                transition_to_seeds[t] = []
-                            transition_to_seeds[t].append(src_path)
+                        for state, edges in state_data.items():
+                            parts = state.split('-')
+                            if len(parts) > 1:
+                                for i in range(len(parts) - 1):
+                                    src = parts[i]
+                                    dst = parts[i+1]
+                                    trans = f"__TRANS_{src}_{dst}__"
+                                    all_transitions.add(trans)
+                                    
+                                    if trans not in transition_to_seeds:
+                                        transition_to_seeds[trans] = []
+                                    # Avoid duplicates if possible, or just append
+                                    transition_to_seeds[trans].append(src_path)
 
     missing_transitions = all_transitions - covered_transitions
     print(f"Found {len(missing_transitions)} missing transitions.")
@@ -257,7 +262,8 @@ def main(cov_file, elites_file, gen):
     os.makedirs(log_dir, exist_ok=True)
     state_log_path = os.path.join(log_dir, 'state.log')
     
-    with open(state_log_path, 'w') as f:
+    with open(state_log_path, 'a') as f:
+        f.write(f"\n=== Generation {gen} (NOSS) ===\n")
         f.write("Pool 0000 (Elites):\n")
         for seed in sorted(elite_seeds_copied):
             f.write(f"{seed}\n")
@@ -274,6 +280,192 @@ def main(cov_file, elites_file, gen):
                     f.write(f"{s}\n")
         else:
             f.write("No distribution performed.\n")
+
+def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
+    print(f"Loading coverage file: {cov_file}")
+    with open(cov_file, 'r') as f:
+        cov_data = json.load(f)
+    
+    print(f"Loading elites file: {elites_file}")
+    with open(elites_file, 'r') as f:
+        elites_data = json.load(f)
+
+    # Cache for seed maps: (gen_dir_name, pool) -> seed_map
+    seed_map_cache = {} 
+
+    def get_cached_seed_path(gen_dir, pool, seed_prefix):
+        key = (gen_dir, pool)
+        if key not in seed_map_cache:
+             base_dir = os.path.join(elmfuzz_rundir, gen_dir, 'aflnetout', pool)
+             seed_map_cache[key] = get_seed_map(base_dir)
+        return seed_map_cache[key].get(seed_prefix)
+
+    # 1. Identify and Copy Elite Seeds (Pool 0000)
+    dest_0000 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0000')
+    os.makedirs(dest_0000, exist_ok=True)
+    
+    elite_seeds_info = [] # List of {'path': str, 'transitions': set(), 'name': str}
+    
+    # Parse Elites
+    for prev_gen, states in elites_data.items():
+        gen_dir_name = resolve_gen_dir(elmfuzz_rundir, prev_gen)
+        for state_pool, files in states.items():
+            for filename_key, val in files.items():
+                # Extract seed info
+                if ':state:' in filename_key:
+                    seed_name_full = filename_key.split(':state:')[0]
+                else:
+                    seed_name_full = filename_key
+                seed_id_prefix = seed_name_full.split(',')[0]
+                
+                src_path = get_cached_seed_path(gen_dir_name, state_pool, seed_id_prefix)
+                
+                if src_path:
+                    # Extract transitions for this elite seed
+                    transitions = set()
+                    edges = []
+                    if isinstance(val, list) and len(val) == 2:
+                        edges = val[0]
+                    elif isinstance(val, dict) and 'edges' in val:
+                        edges = val['edges']
+                    
+                    for e in edges:
+                        if isinstance(e, str) and e.startswith('__TRANS_'):
+                            transitions.add(e)
+                            
+                    elite_seeds_info.append({
+                        'path': src_path,
+                        'name': seed_name_full,
+                        'transitions': transitions
+                    })
+                    
+                    shutil.copy(src_path, dest_0000)
+                else:
+                    print(f"Warning: Elite seed not found: {seed_name_full} (prefix {seed_id_prefix}) in {state_pool}", file=sys.stderr)
+
+    print(f"Copied {len(elite_seeds_info)} elite seeds to {dest_0000}")
+
+    # 2. Analyze Transitions (Global vs Elite)
+    elite_covered_transitions = set()
+    transition_counts = {} # transition -> count in elites
+    
+    for seed in elite_seeds_info:
+        for t in seed['transitions']:
+            elite_covered_transitions.add(t)
+            transition_counts[t] = transition_counts.get(t, 0) + 1
+
+    # Parse Coverage Data to find missing transitions
+    # We need to map transitions to candidate seeds (path, size)
+    missing_transition_candidates = {} # transition -> list of {'path': str, 'size': int}
+    
+    # Calculate generation string
+    try:
+        gen_num = int(gen.replace('gen', '')) - 1
+        gen_str = str(gen_num)
+    except ValueError:
+        gen_str = "0" # Fallback
+
+    if gen_str in cov_data:
+        gen_dir_name = resolve_gen_dir(elmfuzz_rundir, gen_str)
+        for job, seeds in cov_data[gen_str].items():
+            for seed_name, state_data in seeds.items():
+                if isinstance(state_data, dict):
+                    seed_id_prefix = seed_name.split(',')[0]
+                    src_path = get_cached_seed_path(gen_dir_name, job, seed_id_prefix)
+                    
+                    if src_path:
+                        try:
+                            size = os.path.getsize(src_path)
+                        except OSError:
+                            size = float('inf')
+
+                        # Extract transitions for this seed
+                        seed_transitions = set()
+                        for state, edges in state_data.items():
+                            parts = state.split('-')
+                            if len(parts) > 1:
+                                for i in range(len(parts) - 1):
+                                    src = parts[i]
+                                    dst = parts[i+1]
+                                    trans = f"__TRANS_{src}_{dst}__"
+                                    seed_transitions.add(trans)
+                        
+                        # Check if any are missing from elites
+                        for t in seed_transitions:
+                            if t not in elite_covered_transitions:
+                                if t not in missing_transition_candidates:
+                                    missing_transition_candidates[t] = []
+                                missing_transition_candidates[t].append({'path': src_path, 'size': size})
+
+    # 3. Populate Pool 0001 (Missing Transitions)
+    dest_0001 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0001')
+    os.makedirs(dest_0001, exist_ok=True)
+    
+    seeds_to_rescue = set()
+    for t, candidates in missing_transition_candidates.items():
+        # Pick smallest
+        best_candidate = min(candidates, key=lambda x: x['size'])
+        seeds_to_rescue.add(best_candidate['path'])
+        
+    for src_path in seeds_to_rescue:
+        shutil.copy(src_path, dest_0001)
+        
+    print(f"Copied {len(seeds_to_rescue)} seeds covering {len(missing_transition_candidates)} missing transitions to {dest_0001}")
+
+    # 4. Distribute Elites to Other Pools (Weighted Round Robin)
+    state_pools = get_state_pools()
+    # Filter out 0000 and 0001
+    target_pools = [p for p in state_pools if p not in ['0000', '0001']]
+    
+    if target_pools:
+        # Calculate Rarity Score for each Elite Seed
+        # Score = Sum(1 / count) for each transition
+        for seed in elite_seeds_info:
+            score = 0
+            for t in seed['transitions']:
+                count = transition_counts.get(t, 1)
+                score += 1.0 / count
+            seed['score'] = score
+            
+        # Sort by score descending (most rare/unique first)
+        sorted_elites = sorted(elite_seeds_info, key=lambda x: x['score'], reverse=True)
+        
+        # Round Robin Distribution
+        pool_assignments = {p: [] for p in target_pools}
+        pool_names = sorted(target_pools) # Ensure deterministic order
+        
+        for i, seed in enumerate(sorted_elites):
+            target_pool = pool_names[i % len(pool_names)]
+            pool_assignments[target_pool].append(seed)
+            
+        # Perform Copy
+        for pool, seeds in pool_assignments.items():
+            dest_pool = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
+            os.makedirs(dest_pool, exist_ok=True)
+            for s in seeds:
+                shutil.copy(s['path'], dest_pool)
+            print(f"  Pool {pool}: Copied {len(seeds)} seeds (Weighted Round Robin).")
+            
+    else:
+        print("No other state pools to distribute to.")
+
+@click.command()
+@click.option('--cov_file', '-c', type=click.Path(exists=True), required=True, help='Previous generation coverage file')
+@click.option('--elites_file', '-e', type=click.Path(exists=True), required=True, help='Current generation elite seeds file')
+@click.option('--gen', '-g', type=str, required=True, help='Next generation name')
+@click.option('--noss', is_flag=True, default=False, help='Use current state selection algorithm')
+@click.option('--ss', '-ss', is_flag=True, default=False, help='Use new state selection algorithm')
+def main(cov_file, elites_file, gen, noss, ss):
+    elmfuzz_rundir = os.environ.get('ELMFUZZ_RUNDIR')
+    if not elmfuzz_rundir:
+        print("Error: ELMFuzz_RUNDIR environment variable not set.", file=sys.stderr)
+        sys.exit(1)
+
+    if ss:
+        select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir)
+    else:
+        # Default to noss if not specified or if noss is specified
+        select_states_noss(cov_file, elites_file, gen, elmfuzz_rundir)
 
 if __name__ == '__main__':
     main()

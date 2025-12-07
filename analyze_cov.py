@@ -30,12 +30,13 @@ def cumulative_cov(covfiles):
         with open(covfile, 'r') as f:
             cov = json.load(f)
         for model, generators in cov.items():
-            for generator, cov in generators.items():
-                cov_by_gen[gen].update(cov)
+            for generator, seeds in generators.items():
+                for seed_edges in seeds.values():
+                    cov_by_gen[gen].update(seed_edges)
     cumulative = set()
     data = []
-    for gen, cov in sorted(cov_by_gen.items()):
-        cumulative.update(cov)
+    for gen, edges in sorted(cov_by_gen.items()):
+        cumulative.update(edges)
         data.append((gen, len(cumulative)))
     return data
 
