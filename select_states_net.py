@@ -49,30 +49,7 @@ def get_seed_map(base_dir):
                 pass
     return seed_map
 
-def get_transitions(state_str):
-    """
-    Parses a state string (e.g., "0-200-201") into a set of transitions.
-    Handles 'end-at-' by truncating the sequence before it.
-    """
-    if not state_str:
-        return set()
-    
-    end_at_index = state_str.find('end-at-')
-    if end_at_index != -1:
-        clean_str = state_str[:end_at_index]
-        if clean_str.endswith('-'):
-            clean_str = clean_str[:-1]
-    else:
-        clean_str = state_str
 
-    parts = clean_str.split('-')
-    states = [p for p in parts if p]
-    
-    transitions = set()
-    for i in range(len(states) - 1):
-        transitions.add((states[i], states[i+1]))
-    
-    return transitions
 
 def resolve_gen_dir(elmfuzz_rundir, gen_name):
     """
@@ -397,29 +374,39 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
                                     missing_transition_candidates[t] = []
                                 missing_transition_candidates[t].append({'path': src_path, 'size': size})
 
-    # 3. Populate Pool 0001 (Missing Transitions)
-    dest_0001 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0001')
-    os.makedirs(dest_0001, exist_ok=True)
+    # 3. Determine Distribution Strategy
+    state_pools = get_state_pools()
+    # Filter out 0000
+    all_target_pools = sorted([p for p in state_pools if p != '0000'])
     
     seeds_to_rescue = set()
     for t, candidates in missing_transition_candidates.items():
         # Pick smallest
         best_candidate = min(candidates, key=lambda x: x['size'])
         seeds_to_rescue.add(best_candidate['path'])
-        
-    for src_path in seeds_to_rescue:
-        shutil.copy(src_path, dest_0001)
-        
-    print(f"Copied {len(seeds_to_rescue)} seeds covering {len(missing_transition_candidates)} missing transitions to {dest_0001}")
 
-    # 4. Distribute Elites to Other Pools (Weighted Round Robin)
-    state_pools = get_state_pools()
-    # Filter out 0000 and 0001
-    target_pools = [p for p in state_pools if p not in ['0000', '0001']]
+    dist_pools = []
     
-    if target_pools:
+    if seeds_to_rescue:
+        # Case A: Missing transitions exist -> 0001 gets rescue seeds
+        dest_0001 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0001')
+        os.makedirs(dest_0001, exist_ok=True)
+        for src_path in seeds_to_rescue:
+            shutil.copy(src_path, dest_0001)
+        print(f"Copied {len(seeds_to_rescue)} seeds covering {len(missing_transition_candidates)} missing transitions to 0001")
+        
+        # Distribute elites to remaining pools
+        dist_pools = [p for p in all_target_pools if p != '0001']
+    else:
+        # Case B: No missing transitions -> 0001 joins distribution
+        print("No missing transitions found. 0001 joins the distribution pool.")
+        dist_pools = all_target_pools
+
+    # 4. Distribute Elites to Target Pools (Sorted by Rarity)
+    if dist_pools:
         # Calculate Rarity Score for each Elite Seed
         # Score = Sum(1 / count) for each transition
+        # Higher score = More rare (fewer counts)
         for seed in elite_seeds_info:
             score = 0
             for t in seed['transitions']:
@@ -430,21 +417,27 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
         # Sort by score descending (most rare/unique first)
         sorted_elites = sorted(elite_seeds_info, key=lambda x: x['score'], reverse=True)
         
-        # Round Robin Distribution
-        pool_assignments = {p: [] for p in target_pools}
-        pool_names = sorted(target_pools) # Ensure deterministic order
+        num_pools = len(dist_pools)
+        num_seeds = len(sorted_elites)
         
-        for i, seed in enumerate(sorted_elites):
-            target_pool = pool_names[i % len(pool_names)]
-            pool_assignments[target_pool].append(seed)
+        print(f"Distributing {num_seeds} elite seeds to {num_pools} pools: {dist_pools}")
+        
+        # Split into chunks (Slicing instead of Round Robin)
+        chunk_size = math.ceil(num_seeds / num_pools)
+        
+        for i, pool in enumerate(dist_pools):
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, num_seeds)
             
-        # Perform Copy
-        for pool, seeds in pool_assignments.items():
+            chunk = sorted_elites[start_idx:end_idx]
+            
             dest_pool = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
             os.makedirs(dest_pool, exist_ok=True)
-            for s in seeds:
+            
+            for s in chunk:
                 shutil.copy(s['path'], dest_pool)
-            print(f"  Pool {pool}: Copied {len(seeds)} seeds (Weighted Round Robin).")
+            
+            print(f"  Pool {pool}: Copied {len(chunk)} seeds (Rarity Rank {i+1}/{num_pools}).")
             
     else:
         print("No other state pools to distribute to.")

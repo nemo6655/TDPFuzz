@@ -19,7 +19,11 @@ def print_cov(covfiles):
             for generator, seeds in generators.items():
                 edges = set()
                 for seed_edges in seeds.values():
-                    edges.update(seed_edges)
+                    if isinstance(seed_edges, dict):
+                        for e_list in seed_edges.values():
+                            edges.update(e_list)
+                    else:
+                        edges.update(seed_edges)
                 data.append((gen, model, generator, len(edges)))
     return data
 
@@ -32,7 +36,11 @@ def cumulative_cov(covfiles):
         for model, generators in cov.items():
             for generator, seeds in generators.items():
                 for seed_edges in seeds.values():
-                    cov_by_gen[gen].update(seed_edges)
+                    if isinstance(seed_edges, dict):
+                        for e_list in seed_edges.values():
+                            cov_by_gen[gen].update(e_list)
+                    else:
+                        cov_by_gen[gen].update(seed_edges)
     cumulative = set()
     data = []
     for gen, edges in sorted(cov_by_gen.items()):

@@ -201,13 +201,15 @@ def extract_state_pseudo_edges(filename: str) -> set[str]:
 @click.option('--baseline', '-b', type=click.Path(exists=False), default=None)
 @click.option('--use-ilp', '-u', is_flag=True, help='Use ILP to find the minimum set of seeds covering all edges')
 def main(generation: str, current_covfile, max_elites: int, input_elite_file, output_elite_file, baseline, use_ilp):
-    # if generation.startswith('gen'):
-    #     try:
-    #         gen_num = int(generation[3:])
-    #         max_elites += gen_num * 500
-    #         print(f"DEBUG: Adjusted max_elites to {max_elites} for generation {generation}", file=sys.stderr)
-    #     except ValueError:
-    #         pass
+    if generation.startswith('gen'):
+        try:
+            gen_num = int(generation[3:])
+            initial_max_elites = max_elites
+            harmonic_sum = sum(1/i for i in range(1, gen_num + 1))
+            max_elites = int(initial_max_elites * (1 + harmonic_sum))
+            print(f"DEBUG: Adjusted max_elites to {max_elites} for generation {generation} (Harmonic factor: {1 + harmonic_sum:.2f})", file=sys.stderr)
+        except ValueError:
+            pass
 
     if generation == 'initial':
         coverage_raw = dict()
@@ -713,7 +715,7 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
         except:
             print(f'DEBUG: elite_key = {elite_key}', file=sys.stderr, flush=True)
             raise
-        print(f'{len(elite_edges)} {gen} {state} {generator}', flush=True)
+        # print(f'{len(elite_edges)} {gen} {state} {generator}', flush=True)
     
 if __name__ == '__main__':
     main()

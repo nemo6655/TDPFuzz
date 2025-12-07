@@ -121,7 +121,7 @@ def generate_files(seeds_dir, output_dir):
 
     with open(rtsp_all_path, "w") as f:
         f.write(content)
-    print(f"Generated {rtsp_all_path}")
+    # print(f"Generated {rtsp_all_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
