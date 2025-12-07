@@ -36,7 +36,7 @@ run:
   # Selection strategy (one of: elites, best_of_generation) (default: elites)
   selection_strategy: lattice
   # Number of seeds to select each generation (default: 10)
-  num_selected: 800
+  num_selected: 418
   # Directory (template) to store generated variants (default:
   # {ELMFUZZ_RUNDIR}/{GEN}/variants/{MODEL})
   genvariant_dir: '{ELMFUZZ_RUNDIR}/{GEN}/variants/'

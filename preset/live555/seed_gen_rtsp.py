@@ -104,7 +104,7 @@ def generate_files(seeds_dir, output_dir):
         
         with open(py_filepath, "w") as f:
             f.write(content)
-        print(f"Generated {py_filepath}")
+        # print(f"Generated {py_filepath}")
 
     # Generate rtsp_all.py
     rtsp_all_path = os.path.join(output_dir, "rtsp_all.py")

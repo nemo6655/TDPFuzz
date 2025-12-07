@@ -104,7 +104,7 @@ else
 
         python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
        
-        python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --noss
+        python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --ss
         # python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file | \
         #     while read cov gen model generator ; do
         #         echo "Selecting $generator from $gen/$model with $cov edges covered"
