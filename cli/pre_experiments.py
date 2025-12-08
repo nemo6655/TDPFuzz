@@ -237,13 +237,13 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
             }
         case "tdpfuzzer_noss":
             env = os.environ.copy() | {
-                "SELECTION_STRATEGY": "elites",
-                "ELFUZZ_FORBIDDEN_MUTATORS": "",
+                "SELECTION_STRATEGY": "lattice",
+                "ELFUZZ_FORBIDDEN_MUTATORS": "NOSS",
             }
         case "tdpfuzzer_nosm":
             env = os.environ.copy() | {
                 "SELECTION_STRATEGY": "lattice",
-                "ELFUZZ_FORBIDDEN_MUTATORS": "complete",
+                "ELFUZZ_FORBIDDEN_MUTATORS": "NOSM",
             }
         case _:
             raise ValueError(f"Unknown target: {target}")
