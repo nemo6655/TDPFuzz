@@ -1,2 +1,0 @@
-project_dir = cpython3
-entry_file = cpython3/Modules/_xxtestfuzz/fuzzer.c

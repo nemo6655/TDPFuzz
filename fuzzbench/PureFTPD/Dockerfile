@@ -37,10 +37,13 @@ WORKDIR /home/ubuntu
 
 # Import environment variable to pass as parameter to make (e.g., to make parallel builds with -j)
 ARG MAKE_OPT
+COPY --chown=ubuntu:ubuntu aflnet_init_seed_crash.patch /home/ubuntu/aflnet_init_seed_crash.patch
+
 
 # Set up fuzzers
 RUN git clone https://github.com/profuzzbench/aflnet.git && \
     cd aflnet && \
+    patch -p1 < /home/ubuntu/aflnet_init_seed_crash.patch && \
     make clean all $MAKE_OPT && \
     cd llvm_mode && make $MAKE_OPT
 
@@ -105,3 +108,6 @@ RUN useradd -rm -d /home/fuzzing -s /bin/bash -g ubuntu -G sudo -u 1001 fuzzing 
 
 # For debugging purposes
 RUN apt-get -y install ftp
+
+# Ensure runtime scripts are executable inside the image
+RUN chmod +x ${WORKDIR}/run ${WORKDIR}/cov_script ${WORKDIR}/clean

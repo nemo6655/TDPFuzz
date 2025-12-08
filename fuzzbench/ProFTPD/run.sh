@@ -1,10 +1,11 @@
 #!/bin/bash
 
 FUZZER=$1     #fuzzer name (e.g., aflnet) -- this name must match the name of the fuzzer folder inside the Docker container
-OUTDIR=$2     #name of the output folder
-OPTIONS=$3    #all configured options -- to make it flexible, we only fix some options (e.g., -i, -o, -N) in this script
-TIMEOUT=$4    #time for fuzzing
-SKIPCOUNT=$5  #used for calculating cov over time. e.g., SKIPCOUNT=5 means we run gcovr after every 5 test cases
+INPUTS=$2
+OUTDIR=$3     #name of the output folder
+OPTIONS=$4    #all configured options -- to make it flexible, we only fix some options (e.g., -i, -o, -N) in this script
+TIMEOUT=$5    #time for fuzzing
+SKIPCOUNT=$6  #used for calculating cov over time. e.g., SKIPCOUNT=5 means we run gcovr after every 5 test cases
 
 strstr() {
   [ "${1#*$2*}" = "$1" ] && return 1
@@ -20,12 +21,12 @@ if $(strstr $FUZZER "afl"); then
   fi
 
   TARGET_DIR=${TARGET_DIR:-"proftpd"}
-  INPUTS=${INPUTS:-${WORKDIR}"/in-ftp"}
+  # INPUTS=${INPUTS:-${WORKDIR}"/in-ftp"}
 
   #Step-1. Do Fuzzing
   #Move to fuzzing folder
   cd $WORKDIR/${TARGET_DIR}
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -i ${INPUTS} -o $OUTDIR -x ${WORKDIR}/ftp.dict -N tcp://127.0.0.1/21 $OPTIONS -c ${WORKDIR}/clean ./proftpd -n -c ${WORKDIR}/basic.conf -X
+  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 10000 -i ${INPUTS} -o $OUTDIR -x ${WORKDIR}/ftp.dict -N tcp://127.0.0.1/21 $OPTIONS -c ${WORKDIR}/clean ./proftpd -n -c ${WORKDIR}/basic.conf -X
 
   STATUS=$?
 

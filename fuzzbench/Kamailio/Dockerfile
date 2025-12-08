@@ -38,9 +38,12 @@ WORKDIR /home/ubuntu
 # Import environment variable to pass as parameter to make (e.g., to make parallel builds with -j)
 ARG MAKE_OPT
 
+COPY --chown=ubuntu:ubuntu aflnet_init_seed_crash.patch /home/ubuntu/aflnet_init_seed_crash.patch
+
 # Set up fuzzers
 RUN git clone https://github.com/profuzzbench/aflnet.git && \
     cd aflnet && \
+    patch -p1 < /home/ubuntu/aflnet_init_seed_crash.patch && \
     make clean all $MAKE_OPT && \
     cd llvm_mode && make $MAKE_OPT
 
@@ -106,3 +109,6 @@ COPY --chown=ubuntu:ubuntu run.sh ${WORKDIR}/run
 COPY --chown=ubuntu:ubuntu run_pjsip.sh ${WORKDIR}/run_pjsip
 COPY --chown=ubuntu:ubuntu kamailio-basic.cfg ${WORKDIR}/kamailio-basic.cfg
 COPY --chown=ubuntu:ubuntu StarWars3.wav ${WORKDIR}/StarWars3.wav
+
+# Ensure runtime scripts are executable inside the image
+RUN chmod +x ${WORKDIR}/run ${WORKDIR}/cov_script 

@@ -38,9 +38,12 @@ WORKDIR /home/ubuntu
 # Import environment variable to pass as parameter to make (e.g., to make parallel builds with -j)
 ARG MAKE_OPT
 
+COPY --chown=ubuntu:ubuntu aflnet_init_seed_crash.patch /home/ubuntu/aflnet_init_seed_crash.patch
+
 # Set up fuzzers
 RUN git clone https://github.com/profuzzbench/aflnet.git && \
     cd aflnet && \
+    patch -p1 < /home/ubuntu/aflnet_init_seed_crash.patch && \
     make clean all $MAKE_OPT && \
     cd llvm_mode && make $MAKE_OPT
 
@@ -113,3 +116,5 @@ COPY --chown=ubuntu:ubuntu smtp.dict ${WORKDIR}/smtp.dict
 COPY --chown=ubuntu:ubuntu cov_script.sh ${WORKDIR}/cov_script
 COPY --chown=ubuntu:ubuntu run.sh ${WORKDIR}/run
 COPY --chown=ubuntu:ubuntu clean.sh ${WORKDIR}/clean
+
+RUN chmod +x ${WORKDIR}/run ${WORKDIR}/cov_script ${WORKDIR}/clean

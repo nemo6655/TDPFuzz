@@ -1,10 +1,11 @@
 #!/bin/bash
 
 FUZZER=$1     #fuzzer name (e.g., aflnet) -- this name must match the name of the fuzzer folder inside the Docker container
-OUTDIR=$2     #name of the output folder
-OPTIONS=$3    #all configured options -- to make it flexible, we only fix some options (e.g., -i, -o, -N) in this script
-TIMEOUT=$4    #time for fuzzing
-SKIPCOUNT=$5  #used for calculating cov over time. e.g., SKIPCOUNT=5 means we run gcovr after every 5 test cases
+INPUTS=$2
+OUTDIR=$3     #name of the output folder
+OPTIONS=$4    #all configured options -- to make it flexible, we only fix some options (e.g., -i, -o, -N) in this script
+TIMEOUT=$5    #time for fuzzing
+SKIPCOUNT=$6  #used for calculating cov over time. e.g., SKIPCOUNT=5 means we run gcovr after every 5 test cases
 
 strstr() {
   [ "${1#*$2*}" = "$1" ] && return 1
@@ -38,13 +39,13 @@ if $(strstr $FUZZER "afl"); then
   fi
 
   TARGET_DIR=${TARGET_DIR:-"forked-daapd"}
-  INPUTS=${INPUTS:-${WORKDIR}"/in-daap"}
+  # INPUTS=${INPUTS:-${WORKDIR}"/in-daap"}
 
   #Step-1. Do Fuzzing
   #Move to fuzzing folder
   cd $WORKDIR
 
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -i ${INPUTS} -o $OUTDIR -N tcp://127.0.0.1/3689 $OPTIONS ${WORKDIR}/${TARGET_DIR}/src/forked-daapd -d 0 -c ${WORKDIR}/forked-daapd.conf -f
+  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 10000 -i ${INPUTS} -o $OUTDIR -N tcp://127.0.0.1/3689 $OPTIONS ${WORKDIR}/${TARGET_DIR}/src/forked-daapd -d 0 -c ${WORKDIR}/forked-daapd.conf -f
 
   STATUS=$?
 

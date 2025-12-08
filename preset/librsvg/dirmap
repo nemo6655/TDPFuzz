@@ -1,2 +1,0 @@
-project_dir = librsvg
-entry_file = librsvg/fuzz/fuzz_targets/render_document.rs
