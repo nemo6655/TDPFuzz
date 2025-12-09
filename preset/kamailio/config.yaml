@@ -5,16 +5,16 @@
 # -------------------------------- Global options --------------------------------
 
 type: profuzzbench
-project_name: forked-daapd
-fuzzbench_project: forked-daapd_fuzzer
-protocol_type: daap
+project_name: kamailio
+fuzzbench_project: kamailio_fuzzer
+protocol_type: sip
 
 # Options to configure the target program being fuzzed
 target:
   # srcs:
   # Path to the target binary with coverage instrumentation (default: None)
-  covbin: /out/forked-daapd_fuzzer
-  options: "-P HTTP -D 200000 -q 3 -s 3 -E -K"
+  covbin: /out/kamailio_fuzzer
+  options: "-P SIP -l 5061 -D 50000 -q 3 -s 3 -E -K"
 
 # Options to configure the model(s) used for variant generation
 model:
@@ -29,14 +29,14 @@ model:
 run:
   # Seed files (generator programs that will be mutated) (default: None)
   seeds:
-  - /home/appuser/elmfuzz/preset/forked-daapd/init_seeds/*.raw
+  - /home/appuser/elmfuzz/preset/kamailio/init_seeds/*.raw
   # Number of generations to run (default: 10)
   #num_generations: 7
   num_generations: 9
   # Selection strategy (one of: elites, best_of_generation) (default: elites)
   selection_strategy: lattice
   # Number of seeds to select each generation (default: 10)
-  num_selected: 55
+  num_selected: 1166
   # Directory (template) to store generated variants (default:
   # {ELMFUZZ_RUNDIR}/{GEN}/variants/{MODEL})
   genvariant_dir: '{ELMFUZZ_RUNDIR}/{GEN}/variants/'
@@ -97,7 +97,7 @@ cli:
     # Options for the generator; will be passed to each module
     driver:
       # The function to run in each module (default: None)
-      function_name: __daap_gen__
+      function_name: __sip_gen__
       # Timeout for each function run (in seconds) (default: 10)
       timeout: 1
       # Maximum size of the output file (in bytes) (default: 52428800)

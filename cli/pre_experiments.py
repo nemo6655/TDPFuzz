@@ -228,22 +228,25 @@ def synthesize_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iteration
     finally:
         subprocess.run(["sudo", "docker", "stop", "tgi-server"], check=True, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+
+
+
 def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50, use_small_model=False):
     match target:
         case "tdpfuzzer":
             env = os.environ.copy() | {
                 "SELECTION_STRATEGY": "lattice",
-                "ELFUZZ_FORBIDDEN_MUTATORS": ""
+                "TDPFUZZ_FORBIDDEN": ""
             }
         case "tdpfuzzer_noss":
             env = os.environ.copy() | {
                 "SELECTION_STRATEGY": "lattice",
-                "ELFUZZ_FORBIDDEN_MUTATORS": "NOSS",
+                "TDPFUZZ_FORBIDDEN": "NOSS",
             }
         case "tdpfuzzer_nosm":
             env = os.environ.copy() | {
                 "SELECTION_STRATEGY": "lattice",
-                "ELFUZZ_FORBIDDEN_MUTATORS": "NOSM",
+                "TDPFUZZ_FORBIDDEN": "NOSM",
             }
         case _:
             raise ValueError(f"Unknown target: {target}")
@@ -264,18 +267,13 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
             case "tdpfuzzer":
                 target_cap = "tdpfuzzer"
                 fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "tdpfuzzers")
-            # case "elfuzz_nofs":
-            #     target_cap = "elfuzz_noFS"
-            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "alt_elmfuzzers")
-            # case "elfuzz_nocp":
-            #     target_cap = "elfuzz_noCompletion"
-            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nocomp_fuzzers")
-            # case "elfuzz_noin":
-            #     target_cap = "elfuzz_noInfilling"
-            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "noinf_fuzzers")
-            # case "elfuzz_nosp":
-            #     target_cap = "elfuzz_noSpl"
-            #     fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "nospl_fuzzers")
+            case "tdpfuzzer_noss":
+                target_cap = "tdpfuzzer_noss"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "tdpfuzzer_noss")
+            case "tdpfuzzer_nosm":
+                target_cap = "tdpfuzzer_nosm"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "tdpfuzzer_nosm")
+
 
         evolution_record_dir = os.path.join(PROJECT_ROOT, "extradata", "evolution_record", target_cap)
         if not os.path.exists(evolution_record_dir):

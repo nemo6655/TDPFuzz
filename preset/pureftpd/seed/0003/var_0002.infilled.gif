@@ -1,0 +1,22 @@
+USER fuzzing
+PASS fuzzing
+STAT
+PORT 127,0,0,1,14,178
+EPRT ,2,0:0:0:0:0:0:0:0,1025,
+PASV
+TYPE A
+STRU F
+MODE S
+RETR /etc/passwd
+STOR /tmp/f
+LIST
+NLST
+RNFR /etc/passwd
+RNTO /tmp/f
+DELE /etc/passwd
+MKD /tmp/d
+RMD /tmp/d
+CWD /tmp
+CDUP
+SMNT /mnt
+QUIT

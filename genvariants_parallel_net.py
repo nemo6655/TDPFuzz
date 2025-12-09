@@ -99,7 +99,8 @@ def get_mutable_limit(text: str) -> int:
     for i, line in enumerate(lines):
         # Match 'def function_name_gen(' or 'def function_name_gen ('
         # Updated to match __rtsp_gen__ style as well
-        if re.match(r'^\s*def\s+(?:__)?\w+_gen(?:__)?\s*\(', line):
+        # Also ensure it's not a one-line function like 'def foo(): return bar'
+        if re.match(r'^\s*def\s+(?:__)?\w+_gen(?:__)?\s*\(', line) and not re.search(r'\):\s*return', line):
             return i
     return len(lines)
 

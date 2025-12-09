@@ -76,13 +76,36 @@ def select_states_noss(cov_file, elites_file, gen, elmfuzz_rundir):
 
     # Cache for seed maps: (gen_dir_name, pool) -> seed_map
     seed_map_cache = {} 
+    global_seed_map = {}
+    global_scan_done = False
 
     def get_cached_seed_path(gen_dir, pool, seed_prefix):
+        nonlocal global_scan_done
         key = (gen_dir, pool)
         if key not in seed_map_cache:
              base_dir = os.path.join(elmfuzz_rundir, gen_dir, 'aflnetout', pool)
              seed_map_cache[key] = get_seed_map(base_dir)
-        return seed_map_cache[key].get(seed_prefix)
+        
+        path = seed_map_cache[key].get(seed_prefix)
+        if path:
+            return path
+            
+        # Fallback: Scan everything if not done yet
+        if not global_scan_done:
+            print("Scanning all aflnetout directories for missing seeds...", file=sys.stderr)
+            all_dirs = get_all_aflnet_dirs(elmfuzz_rundir)
+            for d in all_dirs:
+                try:
+                    for f in os.listdir(d):
+                        if f.startswith("id:"):
+                            prefix = f.split(',')[0]
+                            if prefix not in global_seed_map:
+                                global_seed_map[prefix] = os.path.join(d, f)
+                except OSError:
+                    pass
+            global_scan_done = True
+            
+        return global_seed_map.get(seed_prefix)
 
     # 1. Copy Elite Seeds to 0000
     dest_0000 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0000')
@@ -269,13 +292,36 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
 
     # Cache for seed maps: (gen_dir_name, pool) -> seed_map
     seed_map_cache = {} 
+    global_seed_map = {}
+    global_scan_done = False
 
     def get_cached_seed_path(gen_dir, pool, seed_prefix):
+        nonlocal global_scan_done
         key = (gen_dir, pool)
         if key not in seed_map_cache:
              base_dir = os.path.join(elmfuzz_rundir, gen_dir, 'aflnetout', pool)
              seed_map_cache[key] = get_seed_map(base_dir)
-        return seed_map_cache[key].get(seed_prefix)
+        
+        path = seed_map_cache[key].get(seed_prefix)
+        if path:
+            return path
+            
+        # Fallback: Scan everything if not done yet
+        if not global_scan_done:
+            print("Scanning all aflnetout directories for missing seeds...", file=sys.stderr)
+            all_dirs = get_all_aflnet_dirs(elmfuzz_rundir)
+            for d in all_dirs:
+                try:
+                    for f in os.listdir(d):
+                        if f.startswith("id:"):
+                            prefix = f.split(',')[0]
+                            if prefix not in global_seed_map:
+                                global_seed_map[prefix] = os.path.join(d, f)
+                except OSError:
+                    pass
+            global_scan_done = True
+            
+        return global_seed_map.get(seed_prefix)
 
     # 1. Identify and Copy Elite Seeds (Pool 0000)
     dest_0000 = os.path.join(elmfuzz_rundir, gen, 'seeds', '0000')
@@ -313,7 +359,8 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
                     elite_seeds_info.append({
                         'path': src_path,
                         'name': seed_name_full,
-                        'transitions': transitions
+                        'transitions': transitions,
+                        'origin_gen': prev_gen
                     })
                     
                     shutil.copy(src_path, dest_0000)
@@ -425,6 +472,8 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
         # Split into chunks (Slicing instead of Round Robin)
         chunk_size = math.ceil(num_seeds / num_pools)
         
+        distribution_results = {}
+
         for i, pool in enumerate(dist_pools):
             start_idx = i * chunk_size
             end_idx = min((i + 1) * chunk_size, num_seeds)
@@ -434,13 +483,78 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
             dest_pool = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
             os.makedirs(dest_pool, exist_ok=True)
             
+            distribution_results[pool] = []
             for s in chunk:
                 shutil.copy(s['path'], dest_pool)
+                distribution_results[pool].append(s['name'])
             
             print(f"  Pool {pool}: Copied {len(chunk)} seeds (Rarity Rank {i+1}/{num_pools}).")
             
     else:
         print("No other state pools to distribute to.")
+        distribution_results = {}
+
+    # 5. Write selection results to log file
+    log_dir = os.path.join(elmfuzz_rundir, gen, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    state_log_path = os.path.join(log_dir, 'state.log')
+    
+    with open(state_log_path, 'a') as f:
+        f.write(f"\n=== Generation {gen} (SS) ===\n")
+        f.write("Pool 0000 (Elites):\n")
+        for seed in sorted(elite_seeds_info, key=lambda x: x['name']):
+            f.write(f"{seed['name']} (Source: {seed['origin_gen']})\n")
+            
+        if seeds_to_rescue:
+            f.write("\nPool 0001 (Missing Transitions):\n")
+            for seed_path in sorted(seeds_to_rescue):
+                f.write(f"{os.path.basename(seed_path)}\n")
+            
+        f.write("\nDistribution:\n")
+        if distribution_results:
+            for pool, seeds in sorted(distribution_results.items()):
+                f.write(f"Pool {pool}:\n")
+                for s in sorted(seeds):
+                    f.write(f"{s}\n")
+        else:
+            f.write("No distribution performed.\n")
+
+def get_all_aflnet_dirs(elmfuzz_rundir):
+    dirs = []
+    # Search in root aflnetout
+    root_aflnet = os.path.join(elmfuzz_rundir, 'aflnetout')
+    if os.path.exists(root_aflnet):
+        try:
+            for d in os.listdir(root_aflnet):
+                full_d = os.path.join(root_aflnet, d)
+                if os.path.isdir(full_d):
+                    dirs.append(full_d)
+                    queue_d = os.path.join(full_d, 'queue')
+                    if os.path.isdir(queue_d):
+                        dirs.append(queue_d)
+        except OSError:
+            pass
+    
+    # Search in gen*/aflnetout
+    if os.path.exists(elmfuzz_rundir):
+        try:
+            for item in os.listdir(elmfuzz_rundir):
+                if (item.startswith('gen') or item.isdigit()) and os.path.isdir(os.path.join(elmfuzz_rundir, item)):
+                    gen_aflnet = os.path.join(elmfuzz_rundir, item, 'aflnetout')
+                    if os.path.exists(gen_aflnet):
+                        try:
+                            for d in os.listdir(gen_aflnet):
+                                full_d = os.path.join(gen_aflnet, d)
+                                if os.path.isdir(full_d):
+                                    dirs.append(full_d)
+                                    queue_d = os.path.join(full_d, 'queue')
+                                    if os.path.isdir(queue_d):
+                                        dirs.append(queue_d)
+                        except OSError:
+                            pass
+        except OSError:
+            pass
+    return dirs
 
 @click.command()
 @click.option('--cov_file', '-c', type=click.Path(exists=True), required=True, help='Previous generation coverage file')

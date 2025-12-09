@@ -1,0 +1,12 @@
+USER fuzzing
+PASS fuzzing
+ACCT fuzzing
+CWD fuzzing
+CDUP
+SMNT fuzzing
+REIN
+PORT fuzzing
+HELP
+STAT
+MKD fuzzing
+QUIT

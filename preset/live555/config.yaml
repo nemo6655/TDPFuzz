@@ -72,7 +72,7 @@ cli:
     # Disable the splice mutator (default: False)
     no_splice: false
     # Number of variants to generate for each seed (default: 1)
-    num_variants: 3
+    num_variants: 2
     # Directory to write variants to (default: .)
     output_dir: .
     # Directory to write generation metadata to (default: logs)

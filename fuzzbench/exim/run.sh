@@ -15,8 +15,8 @@ strstr() {
 #Commands for afl-based fuzzers (e.g., aflnet, aflnwe)
 if $(strstr $FUZZER "afl"); then
 
-  TARGET_DIR=${TARGET_DIR:-"live555"}
-  # INPUTS=${WORKDIR}/in-rtsp
+  TARGET_DIR=${TARGET_DIR:-"exim"}
+  INPUTS=${WORKDIR}/in-smtp
 
   # Run fuzzer-specific commands (if any)
   if [ -e ${WORKDIR}/run-${FUZZER} ]; then
@@ -25,39 +25,37 @@ if $(strstr $FUZZER "afl"); then
 
   #Step-1. Do Fuzzing
   #Move to fuzzing folder
-  cd $WORKDIR/${TARGET_DIR}/testProgs
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000 -i ${INPUTS} -x ${WORKDIR}/rtsp.dict -o $OUTDIR -N tcp://127.0.0.1/8554 $OPTIONS ./testOnDemandRTSPServer 8554
+  cd $WORKDIR/${TARGET_DIR}
+  cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim
+  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000 -i ${INPUTS} -x ${WORKDIR}/smtp.dict -o $OUTDIR -N tcp://127.0.0.1/25 $OPTIONS -c ${WORKDIR}/clean exim -bd -d -oX 25 -oP /var/lock/exim.pid
 
   STATUS=$?
 
+  ${WORKDIR}/clean
+  killall exim 2>&1
+  sleep 1
+
   #Step-2. Collect code coverage over time
   #Move to gcov folder
-  cd $WORKDIR/live555-cov/testProgs
+  cd $WORKDIR/exim-gcov
+  cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim
 
   #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
   #0: the test case is a concatenated message sequence -- there is no message boundary
   #1: the test case is a structured file keeping several request messages
-  if [ $FUZZER == "aflnwe" ]; then
-    cov_script ${WORKDIR}/${TARGET_DIR}/testProgs/${OUTDIR}/ 8554 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/testProgs/${OUTDIR}/cov_over_time.csv 0
+  if [ $FUZZER = "aflnwe" ]; then
+    cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 25 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 0
   else
-    cov_script ${WORKDIR}/${TARGET_DIR}/testProgs/${OUTDIR}/ 8554 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/testProgs/${OUTDIR}/cov_over_time.csv 1
+    cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 25 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 1
   fi
 
-  cd $WORKDIR/live555-cov
-  #copy .hh files since gcovr could not detect them
-  for f in BasicUsageEnvironment liveMedia groupsock UsageEnvironment; do
-    echo $f
-    cp $f/include/*.hh $f/
-  done
-  cd testProgs
+  gcovr -r . --html --html-details -o index.html
+  mkdir ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
+  cp *.html ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
 
-  gcovr -r .. --html --html-details -o index.html
-  mkdir ${WORKDIR}/${TARGET_DIR}/testProgs/${OUTDIR}/cov_html/
-  cp *.html ${WORKDIR}/live555/testProgs/${OUTDIR}/cov_html/
-
-  #Step-3. Save the result to the ${WORKDIR} folder
+  #Step-4. Save the result to the ${WORKDIR} folder
   #Tar all results to a file
-  cd ${WORKDIR}/${TARGET_DIR}/testProgs
+  cd ${WORKDIR}/${TARGET_DIR}
   tar -zcvf ${WORKDIR}/${OUTDIR}.tar.gz ${OUTDIR}
 
   exit $STATUS

@@ -17,6 +17,7 @@ LOGDIR=$(./elmconfig.py get run.logdir -s GEN=${next_gen})
 NUM_SELECTED=$(./elmconfig.py get run.num_selected)
 STATE_POOLS=($(./elmconfig.py get run.state_pools))
 PROTOCOL_TYPE=$(./elmconfig.py get protocol_type)
+TDPFUZZ_FORBIDDEN="${TDPFUZZ_FORBIDDEN:-}"
 
 
 COLOR_RED='\033[0;31m'
@@ -103,8 +104,12 @@ else
         
 
         python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
-       
-        python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --ss
+        
+        if [ -z "$TDPFUZZ_FORBIDDEN" ]; then
+            python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --ss
+        elif [ "$TDPFUZZ_FORBIDDEN" = "NOSS" ]; then
+            python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --noss
+        fi
         # python select_seeds_net.py -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file | \
         #     while read cov gen model generator ; do
         #         echo "Selecting $generator from $gen/$model with $cov edges covered"
@@ -155,19 +160,19 @@ for model_name in $MODELS ; do
         python "$ELMFUZZ_RUNDIR"/seed_gen_${PROTOCOL_TYPE}.py \
             --input_seeds "${GOOUT}/${state_name}/" \
             --init_variants "${GVOUT}/${state_name}/"
-        # TODO: have genvariants_parallel.py do all the models at once
-        # Will have to add in model-specific args to the config and merge
-        # in the starcoder_diff script
-        python genvariants_parallel_net.py \
-            $VARIANT_ARGS \
-            -M "${model_name}" \
-            -O "${GVOUT}/${state_name}/" \
-            -L "${GVLOG}" \
-            "$ELMFUZZ_RUNDIR"/${prev_gen}/variants/${state_name}/*.py \
-        | python genoutputs_net.py \
-            -L "${GOLOG}" \
-            -O "${GOOUT}/${state_name}/" \
-            -g "${prev_gen}"
+      
+        if [ "$TDPFUZZ_FORBIDDEN" != "NOSM" ]; then
+            python genvariants_parallel_net.py \
+                $VARIANT_ARGS \
+                -M "${model_name}" \
+                -O "${GVOUT}/${state_name}/" \
+                -L "${GVLOG}" \
+                "$ELMFUZZ_RUNDIR"/${prev_gen}/variants/${state_name}/*.py \
+            | python genoutputs_net.py \
+                -L "${GOLOG}" \
+                -O "${GOOUT}/${state_name}/" \
+                -g "${prev_gen}"
+        fi
         # rm "$GOLOG"
         # python shrink_variants_in_dir.py --source-dir "${GVOUT}"
     done

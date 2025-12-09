@@ -160,14 +160,14 @@ def make_build_dir_net(fuzzbench_dir: str, patch_info: tuple[str, str, str] | No
             shutil.copy(src_path, dst_path)
 
     # Copy elm_main overrides from rundir if present
-    if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.cc'):
-        shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.cc', project_dir)
-    if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.c'):
-        shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.c', project_dir)
-    if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.rs'):
-        shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.rs', project_dir)
-    if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.py'):
-        shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.py', project_dir)
+    # if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.cc'):
+    #     shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.cc', project_dir)
+    # if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.c'):
+    #     shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.c', project_dir)
+    # if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.rs'):
+    #     shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.rs', project_dir)
+    # if os.path.exists(f'./{ELMFUZZ_RUNDIR}/elm_main.py'):
+    #     shutil.copy(f'./{ELMFUZZ_RUNDIR}/elm_main.py', project_dir)
 
     # Write a copy of the source Dockerfile as elm.Dockerfile
     with open(dockerfile_src, 'r') as df_src, open(os.path.join(project_dir, 'elm.Dockerfile'), 'w') as df_dst:
@@ -182,12 +182,13 @@ def make_build_dir_net(fuzzbench_dir: str, patch_info: tuple[str, str, str] | No
 
 def build_image(project_dir: str):
     project_name = get_config('project_name')
+    
     cmd = [
         'docker',
         'build',
         '--progress', 'plain',
         '-f', './elm.Dockerfile',
-        '-t', f'tdpfuzz/{project_name}{"_glade" if ON_GLADE else ""}',
+        '-t', f'tdpfuzz/{project_name}',
         '.'
     ]
     subprocess.run(cmd, check=True, stdout=sys.stdout, stderr=sys.stderr, cwd=project_dir)

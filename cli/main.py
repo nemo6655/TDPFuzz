@@ -119,7 +119,7 @@ def synthesize(target, benchmark, tgi_waiting, evolution_iterations, use_small_m
     ["tdpfuzzer.tdpfuzzer", "tdpfuzzer.tdpfuzzer_noss", "tdpfuzzer.tdpfuzzer_nosm"]
 ))
 @click.argument("benchmark", required=True, type=click.Choice(
-    ["live555"]
+    ["live555", "exim", "forked-daapd", "kamailio", "proftpd", "pureftpd"]
 ))
 @click.option("--tgi-waiting", "-w", type=int, default=DEFAULT_TGI_WAITING, show_default=True,
               help="This option only works for targets <fuzzer.*>. It provides the estimated time in seconds to wait for the text-generation-inference server to be ready (after downloading the model files and \
@@ -141,12 +141,12 @@ def tdnet(target, benchmark, tgi_waiting, evolution_iterations, use_small_model,
         case "tdpfuzzer.tdpfuzzer" | "tdpfuzzer.tdpfuzzer_noss" | "tdpfuzzer.tdpfuzzer_nosm":
             tdnet_fuzzer(target.split(".")[1], benchmark, tgi_waiting=tgi_waiting, evolution_iterations=evolution_iterations, use_small_model=use_small_model)
             return
-        case "grammar.glade":
-            synthesize_grammar(benchmark)
-            return
-        case "semantics.islearn":
-            synthesize_semantics(benchmark, no_select=no_select_semantic_constraints)
-            return
+        # case "grammar.glade":
+        #     synthesize_grammar(benchmark)
+        #     return
+        # case "semantics.islearn":
+        #     synthesize_semantics(benchmark, no_select=no_select_semantic_constraints)
+        #     return
         case _:
             click.echo(f"Target {target} for `tdnet` hasn't been implemented yet.")
             return

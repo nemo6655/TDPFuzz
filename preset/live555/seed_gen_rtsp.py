@@ -4,6 +4,26 @@ import re
 import argparse
 import sys
 
+KNOWN_RTSP_COMMANDS = {
+    "OPTIONS": b"OPTIONS rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\n\r\n",
+    "DESCRIBE": b"DESCRIBE rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n\r\n",
+    "SETUP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=8000-8001\r\n\r\n",
+    "PLAY": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\nRange: npt=0.000-\r\n\r\n",
+    "PAUSE": b"PAUSE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\n\r\n",
+    "TEARDOWN": b"TEARDOWN rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\n\r\n",
+    "GET_PARAMETER": b"GET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 7\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\n\r\n",
+    "SET_PARAMETER": b"SET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 8\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\nContent-Length: 20\r\n\r\nparam: value",
+    "ANNOUNCE": b"ANNOUNCE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 9\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nContent-Type: application/sdp\r\nContent-Length: 20\r\n\r\nv=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=No Name\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\na=tool:libavformat 58.29.100\r\nm=audio 0 RTP/AVP 10\r\nb=AS:128\r\n",
+    "RECORD": b"RECORD rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 10\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\nRange: npt=0.000-\r\n\r\n",
+    "REDIRECT": b"REDIRECT rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 11\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nLocation: rtsp://127.0.0.1:8554/wavAudioTestNew/\r\n\r\n",
+}
+
+# Logical order for RTSP methods to maximize state transitions
+RTSP_METHOD_ORDER = [
+    "OPTIONS", "DESCRIBE", "ANNOUNCE", "SETUP", "PLAY", "RECORD", "PAUSE",
+    "GET_PARAMETER", "SET_PARAMETER", "TEARDOWN", "REDIRECT"
+]
+
 def get_rtsp_method(payload):
     try:
         # Decode start of payload to find method
@@ -32,6 +52,7 @@ def generate_files(seeds_dir, output_dir):
     
     all_funcs_code_for_all_py = []
     all_funcs_names_for_all_py = []
+    seen_methods = set()
 
     # Common rtsp_gen function code
     rtsp_gen_code =  "def __rtsp_gen__(rng, f):\n"
@@ -73,6 +94,7 @@ def generate_files(seeds_dir, output_dir):
 
         for req_idx, part in enumerate(parts):
             method = get_rtsp_method(part)
+            seen_methods.add(method)
             
             # Function name
             func_name = f"{file_stem}_{req_idx:03d}_{method}"
@@ -106,10 +128,61 @@ def generate_files(seeds_dir, output_dir):
             f.write(content)
         # print(f"Generated {py_filepath}")
 
+    # Generate synthetic seeds for missing methods
+    missing_methods = set(KNOWN_RTSP_COMMANDS.keys()) - seen_methods
+    if missing_methods:
+        print(f"Adding synthetic seeds for missing methods: {missing_methods}")
+        synthetic_funcs_code = []
+        
+        # Sort missing methods based on logical protocol order
+        sorted_missing = sorted(list(missing_methods), key=lambda m: RTSP_METHOD_ORDER.index(m) if m in RTSP_METHOD_ORDER else 999)
+        
+        for method in sorted_missing:
+            payload = KNOWN_RTSP_COMMANDS[method]
+            func_name = f"synthetic_000_{method}"
+            func_code = f"def {func_name}(): return {repr(payload)}"
+            synthetic_funcs_code.append(func_code)
+            all_funcs_code_for_all_py.append(func_code)
+            
+        # Generate synthetic python file
+        py_filename = "rtsp_seeds_synthetic.py"
+        py_filepath = os.path.join(output_dir, py_filename)
+        content = "import os\n\n"
+        content += "\n".join(synthetic_funcs_code)
+        content += "\n\n"
+        content += rtsp_gen_code
+        content += "\n"
+        content += "def main():\n"
+        content += '    with open("synthetic.raw", "wb") as f:\n'
+        content += '        with open("/dev/urandom", "rb") as rng:\n'
+        content += '            __rtsp_gen__(rng, f)\n'
+        content += "\nif __name__ == '__main__':\n    main()\n"
+        
+        with open(py_filepath, "w") as f:
+            f.write(content)
+
     # Generate rtsp_all.py
     rtsp_all_path = os.path.join(output_dir, "rtsp_all.py")
+    
+    # Generate ordered functions for all known commands
+    all_ordered_funcs = []
+    
+    # Use RTSP_METHOD_ORDER + any remaining in KNOWN_RTSP_COMMANDS
+    ordered_methods = list(RTSP_METHOD_ORDER)
+    for cmd in KNOWN_RTSP_COMMANDS:
+        if cmd not in ordered_methods:
+            ordered_methods.append(cmd)
+            
+    for i, method in enumerate(ordered_methods):
+        if method in KNOWN_RTSP_COMMANDS:
+            payload = KNOWN_RTSP_COMMANDS[method]
+            # Use a prefix to ensure sorting order in __rtsp_gen__
+            func_name = f"order_{i:03d}_{method}"
+            func_code = f"def {func_name}(): return {repr(payload)}"
+            all_ordered_funcs.append(func_code)
+
     content = "import os\n\n"
-    content += "\n".join(all_funcs_code_for_all_py)
+    content += "\n".join(all_ordered_funcs)
     content += "\n\n"
     content += rtsp_gen_code
     content += "\n"
