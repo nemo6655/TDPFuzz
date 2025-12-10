@@ -30,27 +30,27 @@ if $(strstr $FUZZER "afl"); then
 
   cd $WORKDIR/${TARGET_DIR}
 
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000 -i ${INPUTS} -o $OUTDIR -N udp://127.0.0.1/5060 $OPTIONS -c ${WORKDIR}/run_pjsip ./src/kamailio -f ${WORKDIR}/kamailio-basic.cfg -L $KAMAILIO_MODULES -Y $KAMAILIO_RUNTIME_DIR -n 1 -D -E
+  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000+ -i ${INPUTS} -o $OUTDIR -N udp://127.0.0.1/5060 $OPTIONS -c ${WORKDIR}/run_pjsip ./src/kamailio -f ${WORKDIR}/kamailio-basic.cfg -L $KAMAILIO_MODULES -Y $KAMAILIO_RUNTIME_DIR -n 1 -D -E
 
   STATUS=$?
 
   #Step-2. Collect code coverage over time
   #Move to gcov folder
-  cd $WORKDIR
+  # cd $WORKDIR
 
-  #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
-  #0: the test case is a concatenated message sequence -- there is no message boundary
-  #1: the test case is a structured file keeping several request messages
-  if [ $FUZZER = "aflnwe" ]; then
-    cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 5060 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 0
-  else
-    cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 5060 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 1
-  fi
+  # #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
+  # #0: the test case is a concatenated message sequence -- there is no message boundary
+  # #1: the test case is a structured file keeping several request messages
+  # if [ $FUZZER = "aflnwe" ]; then
+  #   cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 5060 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 0
+  # else
+  #   cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 5060 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 1
+  # fi
 
-  cd $WORKDIR/kamailio-gcov
-  gcovr -r . --html --html-details -o index.html
-  mkdir ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
-  cp *.html ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
+  # cd $WORKDIR/kamailio-gcov
+  # gcovr -r . --html --html-details -o index.html
+  # mkdir ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
+  # cp *.html ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
 
   #Step-3. Save the result to the ${WORKDIR} folder
   #Tar all results to a file

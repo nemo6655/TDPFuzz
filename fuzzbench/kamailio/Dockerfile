@@ -111,4 +111,4 @@ COPY --chown=ubuntu:ubuntu kamailio-basic.cfg ${WORKDIR}/kamailio-basic.cfg
 COPY --chown=ubuntu:ubuntu StarWars3.wav ${WORKDIR}/StarWars3.wav
 
 # Ensure runtime scripts are executable inside the image
-RUN chmod +x ${WORKDIR}/run ${WORKDIR}/cov_script 
+RUN chmod +x ${WORKDIR}/run ${WORKDIR}/cov_script ${WORKDIR}/run_pjsip

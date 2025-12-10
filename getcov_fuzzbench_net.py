@@ -49,7 +49,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
         covbin_str = covbin
     access_info = on_nsf_access()
     real_feedback = get_config('cli.getcov.real_feedback') == 'true'
-    afl_timeout = int(get_config('cli.getcov.afl_timeout'))
+    # afl_timeout = int(get_config('cli.getcov.afl_timeout'))
     
     cwd = os.path.dirname(os.path.abspath(__file__))
     # if access_info is not None:
@@ -117,8 +117,8 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                     image,
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 50'
                     #DEBUG:
-                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}"  600 50'
-                    # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(3 if next_gen > 5 else next_gen + 1) * 3600} {(next_gen + 1) * 20}'
+                    # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}"  1800 50'
+                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(3 if next_gen > 5 else next_gen + 1) * 3600} {(next_gen + 1) * 20}'
                 ]
                 # start and return container id and run_tmp
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)

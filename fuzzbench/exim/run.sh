@@ -27,7 +27,7 @@ if $(strstr $FUZZER "afl"); then
   #Move to fuzzing folder
   cd $WORKDIR/${TARGET_DIR}
   cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000 -i ${INPUTS} -x ${WORKDIR}/smtp.dict -o $OUTDIR -N tcp://127.0.0.1/25 $OPTIONS -c ${WORKDIR}/clean exim -bd -d -oX 25 -oP /var/lock/exim.pid
+  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000+ -i ${INPUTS} -x ${WORKDIR}/smtp.dict -o $OUTDIR -N tcp://127.0.0.1/25 $OPTIONS -c ${WORKDIR}/clean exim -bd -d -oX 25 -oP /var/lock/exim.pid
 
   STATUS=$?
 
@@ -35,23 +35,23 @@ if $(strstr $FUZZER "afl"); then
   killall exim 2>&1
   sleep 1
 
-  #Step-2. Collect code coverage over time
-  #Move to gcov folder
-  cd $WORKDIR/exim-gcov
-  cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim
+  # #Step-2. Collect code coverage over time
+  # #Move to gcov folder
+  # cd $WORKDIR/exim-gcov
+  # cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim
 
-  #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
-  #0: the test case is a concatenated message sequence -- there is no message boundary
-  #1: the test case is a structured file keeping several request messages
-  if [ $FUZZER = "aflnwe" ]; then
-    cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 25 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 0
-  else
-    cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 25 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 1
-  fi
+  # #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
+  # #0: the test case is a concatenated message sequence -- there is no message boundary
+  # #1: the test case is a structured file keeping several request messages
+  # if [ $FUZZER = "aflnwe" ]; then
+  #   cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 25 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 0
+  # else
+  #   cov_script ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/ 25 ${SKIPCOUNT} ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_over_time.csv 1
+  # fi
 
-  gcovr -r . --html --html-details -o index.html
-  mkdir ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
-  cp *.html ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
+  # gcovr -r . --html --html-details -o index.html
+  # mkdir ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
+  # cp *.html ${WORKDIR}/${TARGET_DIR}/${OUTDIR}/cov_html/
 
   #Step-4. Save the result to the ${WORKDIR} folder
   #Tar all results to a file

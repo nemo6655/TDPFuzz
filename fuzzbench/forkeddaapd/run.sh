@@ -45,27 +45,27 @@ if $(strstr $FUZZER "afl"); then
   #Move to fuzzing folder
   cd $WORKDIR
 
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000 -i ${INPUTS} -o $OUTDIR -N tcp://127.0.0.1/3689 $OPTIONS ${WORKDIR}/${TARGET_DIR}/src/forked-daapd -d 0 -c ${WORKDIR}/forked-daapd.conf -f
+  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000+ -i ${INPUTS} -o $OUTDIR -N tcp://127.0.0.1/3689 $OPTIONS ${WORKDIR}/${TARGET_DIR}/src/forked-daapd -d 0 -c ${WORKDIR}/forked-daapd.conf -f
 
   STATUS=$?
 
-  #Step-2. Collect code coverage over time
-  #Move to gcov folder
-  cd $WORKDIR
+  # #Step-2. Collect code coverage over time
+  # #Move to gcov folder
+  # cd $WORKDIR
 
-  #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
-  #0: the test case is a concatenated message sequence -- there is no message boundary
-  #1: the test case is a structured file keeping several request messages
-  if [ $FUZZER = "aflnwe" ]; then
-    cov_script ${WORKDIR}/${OUTDIR}/ 3689 ${SKIPCOUNT} ${WORKDIR}/${OUTDIR}/cov_over_time.csv 0
-  else
-    cov_script ${WORKDIR}/${OUTDIR}/ 3689 ${SKIPCOUNT} ${WORKDIR}/${OUTDIR}/cov_over_time.csv 1
-  fi
+  # #The last argument passed to cov_script should be 0 if the fuzzer is afl/nwe and it should be 1 if the fuzzer is based on aflnet
+  # #0: the test case is a concatenated message sequence -- there is no message boundary
+  # #1: the test case is a structured file keeping several request messages
+  # if [ $FUZZER = "aflnwe" ]; then
+  #   cov_script ${WORKDIR}/${OUTDIR}/ 3689 ${SKIPCOUNT} ${WORKDIR}/${OUTDIR}/cov_over_time.csv 0
+  # else
+  #   cov_script ${WORKDIR}/${OUTDIR}/ 3689 ${SKIPCOUNT} ${WORKDIR}/${OUTDIR}/cov_over_time.csv 1
+  # fi
 
-  cd $WORKDIR/forked-daapd-gcov
-  gcovr -r . --html --html-details -o index.html
-  mkdir ${WORKDIR}/${OUTDIR}/cov_html/
-  cp *.html ${WORKDIR}/${OUTDIR}/cov_html/
+  # cd $WORKDIR/forked-daapd-gcov
+  # gcovr -r . --html --html-details -o index.html
+  # mkdir ${WORKDIR}/${OUTDIR}/cov_html/
+  # cp *.html ${WORKDIR}/${OUTDIR}/cov_html/
 
   #Step-3. Save the result to the ${WORKDIR} folder
   #Tar all results to a file

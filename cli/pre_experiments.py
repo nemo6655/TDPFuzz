@@ -281,7 +281,8 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
         else:
             for file in os.listdir(evolution_record_dir):
                 os.remove(os.path.join(evolution_record_dir, file))
-        tar_evolution_cmd = ["tar", "-cJf", os.path.join(evolution_record_dir, "evolution.tar.xz"), rundir]
+        eval_name = f"{benchmark}_evolution_{datetime.now().strftime('%y%m%d_%H%M%S')}.tar.xz"
+        tar_evolution_cmd = ["tar", "-cJf", os.path.join(evolution_record_dir, eval_name), rundir]
         subprocess.run(tar_evolution_cmd, check=True, cwd=PROJECT_ROOT)
 
         if not os.path.exists(fuzzer_dir):
