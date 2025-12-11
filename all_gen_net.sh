@@ -107,7 +107,11 @@ if [ $start_gen -eq -1 ]; then
     ./do_gen_net.sh initial gen0
     for i in $(seq 0 $last_gen); do
         ./do_gen_net.sh gen$i gen$((i+1))
+        if [ $i -eq $last_gen ]; then
+            ./do_gen_net_finial.sh gen$((i+1)) gen$((i+2))
+        fi
     done
+
 else
     if [ $start_gen -eq 0 ]; then
         real_start_gen=0

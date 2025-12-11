@@ -5,16 +5,16 @@
 # -------------------------------- Global options --------------------------------
 
 type: profuzzbench
-project_name: forked-daapd
-fuzzbench_project: forked-daapd_fuzzer
+project_name: forkeddaapd
+fuzzbench_project: forkeddaapd_fuzzer
 protocol_type: daap
 
 # Options to configure the target program being fuzzed
 target:
   # srcs:
   # Path to the target binary with coverage instrumentation (default: None)
-  covbin: /out/forked-daapd_fuzzer
-  options: "-P HTTP -D 200000 -q 3 -s 3 -E -K"
+  covbin: /out/forkeddaapd_fuzzer
+  options: "-D 200000 -P HTTP -q 3 -s 3 -E -K"
 
 # Options to configure the model(s) used for variant generation
 model:
@@ -29,7 +29,7 @@ model:
 run:
   # Seed files (generator programs that will be mutated) (default: None)
   seeds:
-  - /home/appuser/elmfuzz/preset/forked-daapd/init_seeds/*.raw
+  - /home/appuser/elmfuzz/preset/forkeddaapd/init_seeds/*.raw
   # Number of generations to run (default: 10)
   #num_generations: 7
   num_generations: 9

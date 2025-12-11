@@ -161,6 +161,27 @@ def generate_stats(logfile):
     if total != 0:
         print(f"  success%: {success/total*100:.2f}%", file=sys.stderr)
 
+    # Write stats to genoutputs_net.log
+    try:
+        log_dir = os.path.dirname(os.path.abspath(logfile))
+        stats_log_path = os.path.join(log_dir, "genoutputs_net.log")
+        
+        output_dir = original_args['output_dir']
+        statename = os.path.basename(os.path.normpath(output_dir))
+        
+        with open(stats_log_path, "a") as f:
+            print(f"State: {statename}", file=f)
+            for k in sorted(running_stats.keys()):
+                print(f"  {k}: {running_stats[k]}", file=f)
+            print(f"  combined: {combined}", file=f)
+            print(f"     total: {total} files attempted", file=f)
+            print(f"   success: {success} files generated", file=f)
+            if total != 0:
+                print(f"  success%: {success/total*100:.2f}%", file=f)
+            print("-" * 40, file=f)
+    except Exception as e:
+        print(f"Error writing stats to log file: {e}", file=sys.stderr)
+
 def generate_filestats(logfile):
     from idontwannadoresearch.txdm import txdm
     def count_unique_files(outdir, ext):
@@ -593,7 +614,13 @@ def main():
                     function_name = args.driver.function_name,
                 )
                 print(res.json(), file=output_log)
+            
+            # Clean up worker dir
+            shutil.rmtree(worker_dir, ignore_errors=True)
         progress.close()
+
+    # Clean up the .work directory
+    shutil.rmtree(os.path.join(args.output_dir, ".work"), ignore_errors=True)
 
     if output_log != sys.stdout:
         output_log.close()

@@ -15,7 +15,6 @@ KNOWN_DAAP_COMMANDS = {
     "DATABASE-ITEMS": b"GET /databases/1/items?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     "DATABASE-CONTAINERS": b"GET /databases/1/containers?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     "RESOLVE": b"GET /resolve?session-id=1&revision-number=1&path=/ HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "LOGOUT": b"GET /logout?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     
     # JSON API (forked-daapd specific)
     "API-CONFIG": b"GET /api/config HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
@@ -30,7 +29,6 @@ DAAP_METHOD_ORDER = [
     "SERVER-INFO", "CONTENT-CODES", "LOGIN", "UPDATE", 
     "DATABASES", "DATABASE-ITEMS", "DATABASE-CONTAINERS", "RESOLVE",
     "API-CONFIG", "API-OUTPUTS", "API-LIBRARY", "API-QUEUE", "API-PLAYBACK",
-    "LOGOUT"
 ]
 
 def get_daap_command(payload):
@@ -195,40 +193,40 @@ def generate_files(seeds_dir, output_dir):
         with open(py_filepath, "w") as f:
             f.write(content)
 
-    # Generate daap_all.py
-    daap_all_path = os.path.join(output_dir, "daap_all.py")
+    # # Generate daap_all.py
+    # daap_all_path = os.path.join(output_dir, "daap_all.py")
     
-    # Generate ordered functions for all known commands
-    all_ordered_funcs = []
+    # # Generate ordered functions for all known commands
+    # all_ordered_funcs = []
     
-    # Use DAAP_METHOD_ORDER + any remaining in KNOWN_DAAP_COMMANDS
-    ordered_methods = list(DAAP_METHOD_ORDER)
-    for cmd in KNOWN_DAAP_COMMANDS:
-        if cmd not in ordered_methods:
-            ordered_methods.append(cmd)
+    # # Use DAAP_METHOD_ORDER + any remaining in KNOWN_DAAP_COMMANDS
+    # ordered_methods = list(DAAP_METHOD_ORDER)
+    # for cmd in KNOWN_DAAP_COMMANDS:
+    #     if cmd not in ordered_methods:
+    #         ordered_methods.append(cmd)
             
-    for i, method in enumerate(ordered_methods):
-        if method in KNOWN_DAAP_COMMANDS:
-            payload = KNOWN_DAAP_COMMANDS[method]
-            # Use a prefix to ensure sorting order in __daap_gen__
-            func_name = f"order_{i:03d}_{method.replace('-', '_')}"
-            func_code = f"def {func_name}(): return {repr(payload)}"
-            all_ordered_funcs.append(func_code)
+    # for i, method in enumerate(ordered_methods):
+    #     if method in KNOWN_DAAP_COMMANDS:
+    #         payload = KNOWN_DAAP_COMMANDS[method]
+    #         # Use a prefix to ensure sorting order in __daap_gen__
+    #         func_name = f"order_{i:03d}_{method.replace('-', '_')}"
+    #         func_code = f"def {func_name}(): return {repr(payload)}"
+    #         all_ordered_funcs.append(func_code)
 
-    content = "import os\n\n"
-    content += "\n".join(all_ordered_funcs)
-    content += "\n\n"
-    content += daap_gen_code
-    content += "\n"
-    content += "def main():\n"
-    content += '    with open("daap_all.raw", "wb") as f:\n'
-    content += '        with open("/dev/urandom", "rb") as rng:\n'
-    content += '            __daap_gen__(rng, f)\n'
-    content += "\nif __name__ == '__main__':\n    main()\n"
+    # content = "import os\n\n"
+    # content += "\n".join(all_ordered_funcs)
+    # content += "\n\n"
+    # content += daap_gen_code
+    # content += "\n"
+    # content += "def main():\n"
+    # content += '    with open("daap_all.raw", "wb") as f:\n'
+    # content += '        with open("/dev/urandom", "rb") as rng:\n'
+    # content += '            __daap_gen__(rng, f)\n'
+    # content += "\nif __name__ == '__main__':\n    main()\n"
 
-    with open(daap_all_path, "w") as f:
-        f.write(content)
-    # print(f"Generated {daap_all_path}")
+    # with open(daap_all_path, "w") as f:
+    #     f.write(content)
+    # # print(f"Generated {daap_all_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

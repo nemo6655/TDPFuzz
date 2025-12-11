@@ -119,7 +119,7 @@ def synthesize(target, benchmark, tgi_waiting, evolution_iterations, use_small_m
     ["tdpfuzzer.tdpfuzzer", "tdpfuzzer.tdpfuzzer_noss", "tdpfuzzer.tdpfuzzer_nosm"]
 ))
 @click.argument("benchmark", required=True, type=click.Choice(
-    ["live555", "exim", "forked-daapd", "kamailio", "proftpd", "pureftpd"]
+    ["live555", "exim", "forkeddaapd", "kamailio", "proftpd", "pureftpd"]
 ))
 @click.option("--tgi-waiting", "-w", type=int, default=DEFAULT_TGI_WAITING, show_default=True,
               help="This option only works for targets <fuzzer.*>. It provides the estimated time in seconds to wait for the text-generation-inference server to be ready (after downloading the model files and \
