@@ -32,7 +32,7 @@ run:
   - /home/appuser/elmfuzz/preset/pureftpd/init_seeds/*.raw
   # Number of generations to run (default: 10)
   #num_generations: 7
-  num_generations: 7
+  num_generations: 5
   # Selection strategy (one of: elites, best_of_generation) (default: elites)
   selection_strategy: lattice
   # Number of seeds to select each generation (default: 10)
