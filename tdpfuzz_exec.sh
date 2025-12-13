@@ -49,7 +49,7 @@ fi
 CONTAINER_NAME="tdpfuzz${TEST_NUMBER}${IMAGE_NAME//:/_}"
 
 # 启动 Docker 容器并运行命令（detached 模式）
-DOCKER_CMD="docker run -d --cpus 8 --add-host=host.docker.internal:host-gateway -v /tmp/host:/tmp/host -v /var/run/docker.sock:/var/run/docker.sock --name \"$CONTAINER_NAME\" --entrypoint /bin/bash \"$IMAGE_NAME\" -c \"cd /home/appuser/elmfuzz && ELMFUZZ_RUNDIR=preset/${TEST_OBJECT} /home/appuser/miniconda3/envs/py310/bin/python /home/appuser/elmfuzz/cli/main.py tdnet -T ${FUZZER_NAME} ${TEST_OBJECT} -n 9\""
+DOCKER_CMD="docker run -d --cpus 8 --add-host=host.docker.internal:host-gateway -v /tmp/host:/tmp/host -v /var/run/docker.sock:/var/run/docker.sock --name \"$CONTAINER_NAME\" --entrypoint /bin/bash \"$IMAGE_NAME\" -c \"cd /home/appuser/elmfuzz && ELMFUZZ_RUNDIR=preset/${TEST_OBJECT} /home/appuser/miniconda3/envs/py310/bin/python /home/appuser/elmfuzz/cli/main.py tdnet -T ${FUZZER_NAME} ${TEST_OBJECT} -n 5\""
 echo "Executing Docker command: $DOCKER_CMD"
 CONTAINER_ID=$(eval "$DOCKER_CMD")
 
@@ -69,20 +69,20 @@ if [ "$EXIT_CODE" -eq 0 ]; then
     
     # 从容器复制 evaluation 目录
     docker cp "$CONTAINER_ID":/home/appuser/elmfuzz/evaluation "$TMP_DIR"/
-    
+    docker logs -f "$CONTAINER_ID" > "$DATA_PATH/docker_logs.txt"
     # 查找 tar.gz 文件
-    TAR_FILE=$(find "$TMP_DIR/evaluation" -name "*.tar.gz" | head -1)
+    TAR_FILE=$(find "$TMP_DIR/evaluation" -name "*.tar.xz" | head -1)
     
     if [ -n "$TAR_FILE" ]; then
         # 复制并重命名文件到 DATA_PATH
-        cp "$TAR_FILE" "$DATA_PATH/${FUZZER_NAME}_${TEST_OBJECT}_${TEST_NUMBER}.tar.gz"
-        echo "File copied to $DATA_PATH/${FUZZER_NAME}_${TEST_OBJECT}_${TEST_NUMBER}.tar.gz"
+        cp "$TAR_FILE" "$DATA_PATH/${FUZZER_NAME}_${TEST_OBJECT}_${TEST_NUMBER}.tar.xz"
+        echo "File copied to $DATA_PATH/${FUZZER_NAME}_${TEST_OBJECT}_${TEST_NUMBER}.tar.xz"
     else
-        echo "No tar.gz file found in the container's evaluation directory."
+        echo "No tar.xz file found in the container's evaluation directory."
     fi
     
     # 清理临时目录
-    rm -rf "$TMP_DIR"
+    # rm -rf "$TMP_DIR"
 else
     echo "Docker container exited with error code: $EXIT_CODE"
     # 输出容器日志以获取错误原因
