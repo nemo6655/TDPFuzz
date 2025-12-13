@@ -118,7 +118,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 50'
                     #DEBUG:
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}"  1800 50'
-                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(3 if next_gen > 5 else next_gen + 1) * 3600} {(next_gen + 1) * 20}'
+                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(9 if next_gen > 4 else next_gen + 1) * 3600} {(next_gen + 1) * 20}'
                 ]
                 # start and return container id and run_tmp
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)
