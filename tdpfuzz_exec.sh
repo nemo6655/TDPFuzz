@@ -46,7 +46,7 @@ if [ ! -d "$DATA_PATH" ]; then
 fi
 
 # 构建容器名称（替换冒号为下划线以避免无效字符）
-CONTAINER_NAME="tdpfuzz${TEST_NUMBER}${IMAGE_NAME//:/_}"
+CONTAINER_NAME="tdpfuzz_${TEST_OBJECT}_${IMAGE_NAME//:/_}_${TEST_NUMBER}"
 
 # 启动 Docker 容器并运行命令（detached 模式）
 DOCKER_CMD="docker run -d --cpus 8 --add-host=host.docker.internal:host-gateway -v /tmp/host:/tmp/host -v /var/run/docker.sock:/var/run/docker.sock --name \"$CONTAINER_NAME\" --entrypoint /bin/bash \"$IMAGE_NAME\" -c \"cd /home/appuser/elmfuzz && ELMFUZZ_RUNDIR=preset/${TEST_OBJECT} /home/appuser/miniconda3/envs/py310/bin/python /home/appuser/elmfuzz/cli/main.py tdnet -T ${FUZZER_NAME} ${TEST_OBJECT} -n 5\""
