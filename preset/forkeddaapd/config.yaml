@@ -105,7 +105,7 @@ cli:
       # Maximum memory usage (in bytes) (default: 1073741824)
       max_mem: 1073741824
       # Suffix for output files (default: .gif)
-      output_suffix: .raw
+      output_suffix: ""
       # Number of times to run each function in each module (i.e., number of
       # outputs to generate) (default: 100)
       num_iterations: 1

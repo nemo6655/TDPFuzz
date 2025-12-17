@@ -7,7 +7,7 @@ prev_gen="$1"
 next_gen="$2"
 # Compute prev_prev_gen: if prev_gen is of form gen<N>, set prev_prev_gen=gen<N-1>
 
-
+seeds=$(./elmconfig.py get run.seeds)
 num_gens=$(./elmconfig.py get run.num_generations)
 
 # MODELS="codellama starcoder starcoder_diff"
@@ -173,6 +173,7 @@ for model_name in $MODELS ; do
                 -O "${GOOUT}/${state_name}/" \
                 -g "${prev_gen}"
         fi
+        cp -r $seeds "${GOOUT}/${state_name}/"
         # rm "$GOLOG"
         # python shrink_variants_in_dir.py --source-dir "${GVOUT}"
     done
