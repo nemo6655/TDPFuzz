@@ -6,20 +6,21 @@ import sys
 
 # Standard SIP Methods (RFC 3261 and extensions)
 KNOWN_SIP_COMMANDS = {
-    "INVITE": b"INVITE sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1234\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 1 INVITE\r\nContact: <sip:user@127.0.0.1:5061>\r\nMax-Forwards: 70\r\nContent-Type: application/sdp\r\nContent-Length: 0\r\n\r\n",
-    "ACK": b"ACK sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1235\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>;tag=2\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 1 ACK\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "BYE": b"BYE sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1236\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>;tag=2\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 2 BYE\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "CANCEL": b"CANCEL sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1234\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 1 CANCEL\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "REGISTER": b"REGISTER sip:127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1237\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:user@127.0.0.1>\r\nCall-ID: 5678@127.0.0.1\r\nCSeq: 1 REGISTER\r\nContact: <sip:user@127.0.0.1:5061>\r\nMax-Forwards: 70\r\nExpires: 3600\r\nContent-Length: 0\r\n\r\n",
-    "OPTIONS": b"OPTIONS sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1238\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>\r\nCall-ID: 9012@127.0.0.1\r\nCSeq: 1 OPTIONS\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "INFO": b"INFO sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1239\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>;tag=2\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 3 INFO\r\nMax-Forwards: 70\r\nContent-Type: application/dtmf-relay\r\nContent-Length: 0\r\n\r\n",
-    "PRACK": b"PRACK sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1240\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>;tag=2\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 4 PRACK\r\nRAck: 1 1 INVITE\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "SUBSCRIBE": b"SUBSCRIBE sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1241\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>\r\nCall-ID: 3456@127.0.0.1\r\nCSeq: 1 SUBSCRIBE\r\nEvent: presence\r\nExpires: 600\r\nContact: <sip:user@127.0.0.1:5061>\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "NOTIFY": b"NOTIFY sip:user@127.0.0.1:5061 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bK-1242\r\nFrom: <sip:service@127.0.0.1>;tag=2\r\nTo: <sip:user@127.0.0.1>;tag=1\r\nCall-ID: 3456@127.0.0.1\r\nCSeq: 1 NOTIFY\r\nEvent: presence\r\nSubscription-State: active\r\nMax-Forwards: 70\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
-    "PUBLISH": b"PUBLISH sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1243\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>\r\nCall-ID: 7890@127.0.0.1\r\nCSeq: 1 PUBLISH\r\nEvent: presence\r\nExpires: 600\r\nMax-Forwards: 70\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
-    "MESSAGE": b"MESSAGE sip:user@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1244\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:user@127.0.0.1>\r\nCall-ID: 1111@127.0.0.1\r\nCSeq: 1 MESSAGE\r\nMax-Forwards: 70\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\nHello",
-    "REFER": b"REFER sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1245\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>;tag=2\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 5 REFER\r\nRefer-To: <sip:other@127.0.0.1>\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
-    "UPDATE": b"UPDATE sip:service@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-1246\r\nFrom: <sip:user@127.0.0.1>;tag=1\r\nTo: <sip:service@127.0.0.1>;tag=2\r\nCall-ID: 1234@127.0.0.1\r\nCSeq: 6 UPDATE\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n",
+    "INVITE": b"INVITE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-2\r\nFrom: sipp <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1:5060>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 INVITE\r\nContact: sip:30@127.0.0.1:5061\r\nMax-Forwards: 100\r\nContent-Type: application/sdp\r\nContent-Length: 129\r\n\r\nv=0\r\no=user1 53655765 2353687637 IN IP4 127.0.0.1\r\ns=-\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 6000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\n",
+    "ACK": b"ACK sip:33@127.0.0.1:5068;ob SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-7\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nRoute: <sip:127.0.0.1;lr>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 ACK\r\nContact: sip:30@127.0.0.1:5061\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "BYE": b"BYE sip:33@127.0.0.1:5068;ob SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-9\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nRoute: <sip:127.0.0.1;lr>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 3 BYE\r\nContact: sip:sipp@127.0.0.1:5061\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "CANCEL": b"CANCEL sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-2\r\nFrom: sipp <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1:5060>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 CANCEL\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "REGISTER": b"REGISTER sip:127.0.0.1 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-0\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 REGISTER\r\nContact: sip:30@127.0.0.1:5061\r\nMax-Forwards: 100\r\nExpires: 120\r\nUser-Agent: SIPp/Win32\r\nContent-Length: 0\r\n\r\n",
+    "REGISTER_AUTH": b"REGISTER sip:127.0.0.1 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-1\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 REGISTER\r\nContact: sip:30@127.0.0.1:5061\r\nAuthorization: Digest username=\"30\", realm=\"127.0.0.1\", nonce=\"4b4b4b4b\", uri=\"sip:127.0.0.1\", response=\"6629fae49393a05397450978507c4ef1\", algorithm=MD5\r\nMax-Forwards: 100\r\nExpires: 120\r\nUser-Agent: SIPp/Win32\r\nContent-Length: 0\r\n\r\n",
+    "OPTIONS": b"OPTIONS sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-8\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 OPTIONS\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "INFO": b"INFO sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-9\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 3 INFO\r\nMax-Forwards: 100\r\nContent-Type: application/dtmf-relay\r\nContent-Length: 0\r\n\r\n",
+    "PRACK": b"PRACK sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-10\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 4 PRACK\r\nRAck: 1 1 INVITE\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "SUBSCRIBE": b"SUBSCRIBE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-11\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 SUBSCRIBE\r\nEvent: presence\r\nExpires: 600\r\nContact: <sip:30@127.0.0.1:5061>\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "NOTIFY": b"NOTIFY sip:30@127.0.0.1:5061 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bK-670-1-12\r\nFrom: <sip:33@127.0.0.1>;tag=2\r\nTo: <sip:30@127.0.0.1>;tag=1\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 NOTIFY\r\nEvent: presence\r\nSubscription-State: active\r\nMax-Forwards: 100\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
+    "PUBLISH": b"PUBLISH sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-13\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 PUBLISH\r\nEvent: presence\r\nExpires: 600\r\nMax-Forwards: 100\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
+    "MESSAGE": b"MESSAGE sip:30@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-14\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 MESSAGE\r\nMax-Forwards: 100\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\nHello",
+    "REFER": b"REFER sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-15\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 5 REFER\r\nRefer-To: <sip:other@127.0.0.1>\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "UPDATE": b"UPDATE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-16\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 6 UPDATE\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
 }
 
 # Logical order for SIP methods to maximize state transitions
@@ -171,40 +172,49 @@ def generate_files(seeds_dir, output_dir):
         with open(py_filepath, "w") as f:
             f.write(content)
 
-    # Generate sip_all.py
-    sip_all_path = os.path.join(output_dir, "sip_all.py")
-    
-    # Generate ordered functions for all known commands
-    all_ordered_funcs = []
-    
-    # Use METHOD_ORDER + any remaining in KNOWN_SIP_COMMANDS
-    ordered_methods = list(METHOD_ORDER)
-    for cmd in KNOWN_SIP_COMMANDS:
-        if cmd not in ordered_methods:
-            ordered_methods.append(cmd)
-            
-    for i, method in enumerate(ordered_methods):
-        if method in KNOWN_SIP_COMMANDS:
-            payload = KNOWN_SIP_COMMANDS[method]
-            # Use a prefix to ensure sorting order in __sip_gen__
-            func_name = f"order_{i:03d}_{method}"
-            func_code = f"def {func_name}(): return {repr(payload)}"
-            all_ordered_funcs.append(func_code)
+    # Generate valid business flow seeds
+    SIP_FLOWS = {
+        "register": ["REGISTER"],
+        "register_auth": ["REGISTER", "REGISTER_AUTH"],
+        "invite_ack_bye": ["INVITE", "ACK", "BYE"],
+        "invite_cancel": ["INVITE", "CANCEL"],
+        "options": ["OPTIONS"],
+        "subscribe_notify": ["SUBSCRIBE", "NOTIFY"],
+        "message": ["MESSAGE"],
+        "refer": ["INVITE", "ACK", "REFER", "BYE"],
+        "info": ["INVITE", "ACK", "INFO", "BYE"],
+        "update": ["INVITE", "UPDATE", "ACK", "BYE"]
+    }
 
-    content = "import os\n\n"
-    content += "\n".join(all_ordered_funcs)
-    content += "\n\n"
-    content += sip_gen_code
-    content += "\n"
-    content += "def main():\n"
-    content += '    with open("sip_all.raw", "wb") as f:\n'
-    content += '        with open("/dev/urandom", "rb") as rng:\n'
-    content += '            __sip_gen__(rng, f)\n'
-    content += "\nif __name__ == '__main__':\n    main()\n"
+    for flow_name, methods in SIP_FLOWS.items():
+        flow_funcs_code = []
+        for i, method in enumerate(methods):
+            if method in KNOWN_SIP_COMMANDS:
+                payload = KNOWN_SIP_COMMANDS[method]
+                func_name = f"flow_{i:03d}_{method}"
+                func_code = f"def {func_name}(): return {repr(payload)}"
+                flow_funcs_code.append(func_code)
+        
+        if not flow_funcs_code:
+            continue
 
-    with open(sip_all_path, "w") as f:
-        f.write(content)
-    # print(f"Generated {sip_all_path}")
+        py_filename = f"sip_flow_{flow_name}.py"
+        py_filepath = os.path.join(output_dir, py_filename)
+        
+        content = "import os\n\n"
+        content += "\n".join(flow_funcs_code)
+        content += "\n\n"
+        content += sip_gen_code
+        content += "\n"
+        content += "def main():\n"
+        content += f'    with open("{flow_name}.raw", "wb") as f:\n'
+        content += '        with open("/dev/urandom", "rb") as rng:\n'
+        content += '            __sip_gen__(rng, f)\n'
+        content += "\nif __name__ == '__main__':\n    main()\n"
+
+        with open(py_filepath, "w") as f:
+            f.write(content)
+        # print(f"Generated {py_filepath}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

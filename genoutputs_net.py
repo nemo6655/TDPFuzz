@@ -116,7 +116,10 @@ def get_gentype(module_path):
     #  => diffmode
     # E.g.: var_0000.complete.py
     #  => complete
-    return gentype_re.search(basename).group('gentype')
+    match = gentype_re.search(basename)
+    if match:
+        return match.group('gentype')
+    return "initial"
 
 def generate_stats(logfile):
     color_preferences = {

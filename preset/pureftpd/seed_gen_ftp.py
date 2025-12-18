@@ -6,8 +6,8 @@ import sys
 
 KNOWN_COMMANDS = {
     # Access Control
-    "USER": b"USER anonymous",
-    "PASS": b"PASS anonymous@",
+    "USER": b"USER fuzzing",
+    "PASS": b"PASS fuzzing",
     "ACCT": b"ACCT account",
     "CWD":  b"CWD /",
     "CDUP": b"CDUP",
@@ -21,22 +21,23 @@ KNOWN_COMMANDS = {
     "STRU": b"STRU F",
     "MODE": b"MODE S",
     # FTP Service
-    "RETR": b"RETR file.txt",
-    "STOR": b"STOR file.txt",
-    "STOU": b"STOU file.txt",
-    "APPE": b"APPE file.txt",
+    "RETR": b"RETR test.txt",
+    "STOR": b"STOR test.txt",
+    "STOU": b"STOU test.txt",
+    "APPE": b"APPE test.txt",
     "ALLO": b"ALLO 1024",
     "REST": b"REST 0",
-    "RNFR": b"RNFR oldname",
-    "RNTO": b"RNTO newname",
+    "RNFR": b"RNFR test.txt",
+    "RNTO": b"RNTO test2.txt",
     "ABOR": b"ABOR",
-    "DELE": b"DELE file.txt",
-    "RMD":  b"RMD dir",
-    "MKD":  b"MKD dir",
+    "DELE": b"DELE test.txt",
+    "RMD":  b"RMD testdir",
+    "MKD":  b"MKD testdir",
     "PWD":  b"PWD",
     "LIST": b"LIST",
     "NLST": b"NLST",
     "SITE": b"SITE HELP",
+    "SITE_CHMOD": b"SITE CHMOD 777 test.txt",
     "SYST": b"SYST",
     "STAT": b"STAT",
     "HELP": b"HELP",
@@ -44,8 +45,8 @@ KNOWN_COMMANDS = {
     # Extensions
     "FEAT": b"FEAT",
     "OPTS": b"OPTS UTF8 ON",
-    "MDTM": b"MDTM 20200101000000 file.txt",
-    "SIZE": b"SIZE file.txt",
+    "MDTM": b"MDTM 20200101000000 test.txt",
+    "SIZE": b"SIZE test.txt",
     "MLST": b"MLST /",
     "MLSD": b"MLSD /",
     # IPv6
@@ -216,40 +217,47 @@ def generate_files(seeds_dir, output_dir):
         with open(py_filepath, "w") as f:
             f.write(content)
 
-    # Generate ftp_all.py
-    ftp_all_path = os.path.join(output_dir, "ftp_all.py")
-    
-    # Generate ordered functions for all known commands
-    all_ordered_funcs = []
-    
-    # Use FTP_METHOD_ORDER + any remaining in KNOWN_COMMANDS
-    ordered_methods = list(FTP_METHOD_ORDER)
-    for cmd in KNOWN_COMMANDS:
-        if cmd not in ordered_methods:
-            ordered_methods.append(cmd)
-            
-    for i, method in enumerate(ordered_methods):
-        if method in KNOWN_COMMANDS:
-            payload = KNOWN_COMMANDS[method]
-            # Use a prefix to ensure sorting order in __ftp_gen__
-            func_name = f"order_{i:03d}_{method}"
-            func_code = f"def {func_name}(): return {repr(payload)}"
-            all_ordered_funcs.append(func_code)
+    # Generate valid business flow seeds
+    FTP_FLOWS = {
+        "login_list": ["USER", "PASS", "PASV", "LIST", "QUIT"],
+        "upload": ["USER", "PASS", "TYPE", "PASV", "STOR", "QUIT"],
+        "download": ["USER", "PASS", "TYPE", "PASV", "RETR", "QUIT"],
+        "resume_download": ["USER", "PASS", "TYPE", "PASV", "REST", "RETR", "QUIT"],
+        "mkdir_rmdir": ["USER", "PASS", "MKD", "CWD", "PWD", "CDUP", "RMD", "QUIT"],
+        "rename_delete": ["USER", "PASS", "RNFR", "RNTO", "DELE", "QUIT"],
+        "info": ["USER", "PASS", "SYST", "FEAT", "STAT", "HELP", "SITE", "SITE_CHMOD", "QUIT"],
+        "ipv6": ["USER", "PASS", "EPRT", "EPSV", "QUIT"]
+    }
 
-    content = "import os\n\n"
-    content += "\n".join(all_ordered_funcs)
-    content += "\n\n"
-    content += ftp_gen_code
-    content += "\n"
-    content += "def main():\n"
-    content += '    with open("ftp_all.raw", "wb") as f:\n'
-    content += '        with open("/dev/urandom", "rb") as rng:\n'
-    content += '            __ftp_gen__(rng, f)\n'
-    content += "\nif __name__ == '__main__':\n    main()\n"
+    for flow_name, methods in FTP_FLOWS.items():
+        flow_funcs_code = []
+        for i, method in enumerate(methods):
+            if method in KNOWN_COMMANDS:
+                payload = KNOWN_COMMANDS[method]
+                func_name = f"flow_{i:03d}_{method}"
+                func_code = f"def {func_name}(): return {repr(payload)}"
+                flow_funcs_code.append(func_code)
+        
+        if not flow_funcs_code:
+            continue
 
-    with open(ftp_all_path, "w") as f:
-        f.write(content)
-    # print(f"Generated {ftp_all_path}")
+        py_filename = f"ftp_flow_{flow_name}.py"
+        py_filepath = os.path.join(output_dir, py_filename)
+        
+        content = "import os\n\n"
+        content += "\n".join(flow_funcs_code)
+        content += "\n\n"
+        content += ftp_gen_code
+        content += "\n"
+        content += "def main():\n"
+        content += f'    with open("{flow_name}.raw", "wb") as f:\n'
+        content += '        with open("/dev/urandom", "rb") as rng:\n'
+        content += '            __ftp_gen__(rng, f)\n'
+        content += "\nif __name__ == '__main__':\n    main()\n"
+
+        with open(py_filepath, "w") as f:
+            f.write(content)
+        # print(f"Generated {py_filepath}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
