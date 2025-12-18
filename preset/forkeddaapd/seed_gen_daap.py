@@ -15,13 +15,21 @@ KNOWN_DAAP_COMMANDS = {
     "DATABASE-ITEMS": b"GET /databases/1/items?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     "DATABASE-CONTAINERS": b"GET /databases/1/containers?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     "RESOLVE": b"GET /resolve?session-id=1&revision-number=1&path=/ HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "LOGOUT": b"GET /logout?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "STREAM": b"GET /databases/1/items/123.mp3?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     
     # JSON API (forked-daapd specific)
     "API-CONFIG": b"GET /api/config HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-LIBRARY": b"GET /api/library/artists HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-LIBRARY": b"GET /api/library/artists?media_kind=music HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     "API-PLAYBACK": b"PUT /api/player/play HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n\r\n",
     "API-QUEUE": b"GET /api/queue HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
     "API-OUTPUTS": b"GET /api/outputs HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-SPOTIFY": b"GET /api/spotify HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-SEARCH": b"GET /api/search?type=album&expression=time_added+after+8+weeks+ago+and+media_kind+is+music+having+track_count+%3E+3+order+by+time_added+desc&limit=3 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-ARTIST-DETAILS": b"GET /api/library/artists/6812574504550889270 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-ALBUM-DETAILS": b"GET /api/library/albums/7888021095875713269 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-ARTWORK": b"GET /artwork/group/6?maxwidth=600&maxheight=600 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "API-ADD-QUEUE": b"POST /api/queue/items/add?uris=library:track:6 HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n\r\n",
 }
 
 # Logical order for DAAP methods to maximize state transitions
@@ -193,40 +201,49 @@ def generate_files(seeds_dir, output_dir):
         with open(py_filepath, "w") as f:
             f.write(content)
 
-    # # Generate daap_all.py
-    # daap_all_path = os.path.join(output_dir, "daap_all.py")
-    
-    # # Generate ordered functions for all known commands
-    # all_ordered_funcs = []
-    
-    # # Use DAAP_METHOD_ORDER + any remaining in KNOWN_DAAP_COMMANDS
-    # ordered_methods = list(DAAP_METHOD_ORDER)
-    # for cmd in KNOWN_DAAP_COMMANDS:
-    #     if cmd not in ordered_methods:
-    #         ordered_methods.append(cmd)
-            
-    # for i, method in enumerate(ordered_methods):
-    #     if method in KNOWN_DAAP_COMMANDS:
-    #         payload = KNOWN_DAAP_COMMANDS[method]
-    #         # Use a prefix to ensure sorting order in __daap_gen__
-    #         func_name = f"order_{i:03d}_{method.replace('-', '_')}"
-    #         func_code = f"def {func_name}(): return {repr(payload)}"
-    #         all_ordered_funcs.append(func_code)
+    # Generate valid business flow seeds
+    DAAP_FLOWS = {
+        "server_info": ["SERVER-INFO", "CONTENT-CODES", "LOGIN", "UPDATE"],
+        "database_browse": ["SERVER-INFO", "LOGIN", "DATABASES", "DATABASE-ITEMS", "DATABASE-CONTAINERS"],
+        "resolve": ["SERVER-INFO", "LOGIN", "RESOLVE"],
+        "logout": ["SERVER-INFO", "LOGIN", "LOGOUT"],
+        "stream_playback": ["SERVER-INFO", "LOGIN", "DATABASES", "DATABASE-ITEMS", "STREAM"],
+        "api_config": ["API-CONFIG"],
+        "api_playback": ["API-QUEUE", "API-PLAYBACK", "API-OUTPUTS"],
+        "api_library": ["API-LIBRARY"]
+    }
 
-    # content = "import os\n\n"
-    # content += "\n".join(all_ordered_funcs)
-    # content += "\n\n"
-    # content += daap_gen_code
-    # content += "\n"
-    # content += "def main():\n"
-    # content += '    with open("daap_all.raw", "wb") as f:\n'
-    # content += '        with open("/dev/urandom", "rb") as rng:\n'
-    # content += '            __daap_gen__(rng, f)\n'
-    # content += "\nif __name__ == '__main__':\n    main()\n"
+    for flow_name, methods in DAAP_FLOWS.items():
+        flow_funcs_code = []
+        for i, method in enumerate(methods):
+            if method in KNOWN_DAAP_COMMANDS:
+                payload = KNOWN_DAAP_COMMANDS[method]
+                # Sanitize method name for function name (replace - with _)
+                safe_method = re.sub(r'[^a-zA-Z0-9_]', '_', method)
+                func_name = f"flow_{i:03d}_{safe_method}"
+                func_code = f"def {func_name}(): return {repr(payload)}"
+                flow_funcs_code.append(func_code)
+        
+        if not flow_funcs_code:
+            continue
 
-    # with open(daap_all_path, "w") as f:
-    #     f.write(content)
-    # # print(f"Generated {daap_all_path}")
+        py_filename = f"daap_flow_{flow_name}.py"
+        py_filepath = os.path.join(output_dir, py_filename)
+        
+        content = "import os\n\n"
+        content += "\n".join(flow_funcs_code)
+        content += "\n\n"
+        content += daap_gen_code
+        content += "\n"
+        content += "def main():\n"
+        content += f'    with open("{flow_name}.raw", "wb") as f:\n'
+        content += '        with open("/dev/urandom", "rb") as rng:\n'
+        content += '            __daap_gen__(rng, f)\n'
+        content += "\nif __name__ == '__main__':\n    main()\n"
+
+        with open(py_filepath, "w") as f:
+            f.write(content)
+        # print(f"Generated {py_filepath}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -7,14 +7,16 @@ import sys
 KNOWN_RTSP_COMMANDS = {
     "OPTIONS": b"OPTIONS rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\n\r\n",
     "DESCRIBE": b"DESCRIBE rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n\r\n",
-    "SETUP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=8000-8001\r\n\r\n",
-    "PLAY": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\nRange: npt=0.000-\r\n\r\n",
-    "PAUSE": b"PAUSE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\n\r\n",
-    "TEARDOWN": b"TEARDOWN rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\n\r\n",
-    "GET_PARAMETER": b"GET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 7\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\n\r\n",
-    "SET_PARAMETER": b"SET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 8\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\nContent-Length: 20\r\n\r\nparam: value",
+    "SETUP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37952-37953\r\n\r\n",
+    "SETUP_MULTICAST": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;multicast;ttl=127\r\n\r\n",
+    "PLAY": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n\r\n",
+    "PLAY_SCALE": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nScale: 2.0\r\n\r\n",
+    "PAUSE": b"PAUSE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
+    "TEARDOWN": b"TEARDOWN rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
+    "GET_PARAMETER": b"GET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 7\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
+    "SET_PARAMETER": b"SET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 8\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nContent-Type: text/parameters\r\nContent-Length: 12\r\n\r\nparam: value",
     "ANNOUNCE": b"ANNOUNCE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 9\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nContent-Type: application/sdp\r\nContent-Length: 20\r\n\r\nv=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=No Name\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\na=tool:libavformat 58.29.100\r\nm=audio 0 RTP/AVP 10\r\nb=AS:128\r\n",
-    "RECORD": b"RECORD rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 10\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 12345678\r\nRange: npt=0.000-\r\n\r\n",
+    "RECORD": b"RECORD rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 10\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n\r\n",
     "REDIRECT": b"REDIRECT rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 11\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nLocation: rtsp://127.0.0.1:8554/wavAudioTestNew/\r\n\r\n",
 }
 
@@ -161,40 +163,46 @@ def generate_files(seeds_dir, output_dir):
         with open(py_filepath, "w") as f:
             f.write(content)
 
-    # Generate rtsp_all.py
-    rtsp_all_path = os.path.join(output_dir, "rtsp_all.py")
-    
-    # Generate ordered functions for all known commands
-    all_ordered_funcs = []
-    
-    # Use RTSP_METHOD_ORDER + any remaining in KNOWN_RTSP_COMMANDS
-    ordered_methods = list(RTSP_METHOD_ORDER)
-    for cmd in KNOWN_RTSP_COMMANDS:
-        if cmd not in ordered_methods:
-            ordered_methods.append(cmd)
-            
-    for i, method in enumerate(ordered_methods):
-        if method in KNOWN_RTSP_COMMANDS:
-            payload = KNOWN_RTSP_COMMANDS[method]
-            # Use a prefix to ensure sorting order in __rtsp_gen__
-            func_name = f"order_{i:03d}_{method}"
-            func_code = f"def {func_name}(): return {repr(payload)}"
-            all_ordered_funcs.append(func_code)
+    # Generate valid business flow seeds
+    RTSP_FLOWS = {
+        "play_teardown": ["OPTIONS", "DESCRIBE", "SETUP", "PLAY", "TEARDOWN"],
+        "pause_play": ["OPTIONS", "DESCRIBE", "SETUP", "PLAY", "PAUSE", "PLAY", "TEARDOWN"],
+        "fast_forward": ["OPTIONS", "DESCRIBE", "SETUP", "PLAY", "PLAY_SCALE", "TEARDOWN"],
+        "multicast_stream": ["OPTIONS", "DESCRIBE", "SETUP_MULTICAST", "PLAY", "TEARDOWN"],
+        "record": ["OPTIONS", "ANNOUNCE", "SETUP", "RECORD", "TEARDOWN"],
+        "get_set_param": ["OPTIONS", "DESCRIBE", "SETUP", "GET_PARAMETER", "SET_PARAMETER", "TEARDOWN"],
+        "redirect": ["OPTIONS", "DESCRIBE", "REDIRECT"]
+    }
 
-    content = "import os\n\n"
-    content += "\n".join(all_ordered_funcs)
-    content += "\n\n"
-    content += rtsp_gen_code
-    content += "\n"
-    content += "def main():\n"
-    content += '    with open("rtsp_all.raw", "wb") as f:\n'
-    content += '        with open("/dev/urandom", "rb") as rng:\n'
-    content += '            __rtsp_gen__(rng, f)\n'
-    content += "\nif __name__ == '__main__':\n    main()\n"
+    for flow_name, methods in RTSP_FLOWS.items():
+        flow_funcs_code = []
+        for i, method in enumerate(methods):
+            if method in KNOWN_RTSP_COMMANDS:
+                payload = KNOWN_RTSP_COMMANDS[method]
+                func_name = f"flow_{i:03d}_{method}"
+                func_code = f"def {func_name}(): return {repr(payload)}"
+                flow_funcs_code.append(func_code)
+        
+        if not flow_funcs_code:
+            continue
 
-    with open(rtsp_all_path, "w") as f:
-        f.write(content)
-    # print(f"Generated {rtsp_all_path}")
+        py_filename = f"rtsp_flow_{flow_name}.py"
+        py_filepath = os.path.join(output_dir, py_filename)
+        
+        content = "import os\n\n"
+        content += "\n".join(flow_funcs_code)
+        content += "\n\n"
+        content += rtsp_gen_code
+        content += "\n"
+        content += "def main():\n"
+        content += f'    with open("{flow_name}.raw", "wb") as f:\n'
+        content += '        with open("/dev/urandom", "rb") as rng:\n'
+        content += '            __rtsp_gen__(rng, f)\n'
+        content += "\nif __name__ == '__main__':\n    main()\n"
+
+        with open(py_filepath, "w") as f:
+            f.write(content)
+        # print(f"Generated {py_filepath}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

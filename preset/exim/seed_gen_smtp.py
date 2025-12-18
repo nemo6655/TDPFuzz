@@ -15,8 +15,8 @@ KNOWN_SMTP_COMMANDS = {
     "STARTTLS": b"STARTTLS\r\n",
     
     # Mail Transaction
-    "MAIL": b"MAIL FROM:<sender@example.com>\r\n",
-    "RCPT": b"RCPT TO:<recipient@example.com>\r\n",
+    "MAIL": b"MAIL FROM:<ubuntu@ubuntu>\r\n",
+    "RCPT": b"RCPT TO:<ubuntu@ubuntu>\r\n",
     "DATA": b"DATA\r\nSubject: Test\r\n\r\nBody\r\n.\r\n",
     "BDAT": b"BDAT 10 LAST\r\nHelloBDAT\r\n",
     
@@ -28,6 +28,7 @@ KNOWN_SMTP_COMMANDS = {
     # Info & Control
     "HELP": b"HELP\r\n",
     "NOOP": b"NOOP\r\n",
+    "ETRN": b"ETRN example.com\r\n",
     "QUIT": b"QUIT\r\n",
 }
 
@@ -201,39 +202,47 @@ def generate_files(seeds_dir, output_dir):
         with open(py_filepath, "w") as f:
             f.write(content)
 
-    # Generate smtp_all.py
-    smtp_all_path = os.path.join(output_dir, "smtp_all.py")
-    
-    # Generate ordered functions for all known commands
-    all_ordered_funcs = []
-    
-    # Use SMTP_METHOD_ORDER + any remaining in KNOWN_SMTP_COMMANDS
-    ordered_methods = list(SMTP_METHOD_ORDER)
-    for cmd in KNOWN_SMTP_COMMANDS:
-        if cmd not in ordered_methods:
-            ordered_methods.append(cmd)
-            
-    for i, method in enumerate(ordered_methods):
-        if method in KNOWN_SMTP_COMMANDS:
-            payload = KNOWN_SMTP_COMMANDS[method]
-            # Use a prefix to ensure sorting order in __smtp_gen__
-            func_name = f"order_{i:03d}_{method}"
-            func_code = f"def {func_name}(): return {repr(payload)}"
-            all_ordered_funcs.append(func_code)
+    # Generate valid business flow seeds
+    SMTP_FLOWS = {
+        "send_mail": ["EHLO", "MAIL", "RCPT", "DATA", "QUIT"],
+        "auth_send": ["EHLO", "AUTH", "MAIL", "RCPT", "DATA", "QUIT"],
+        "starttls": ["EHLO", "STARTTLS", "EHLO", "QUIT"],
+        "verify": ["EHLO", "VRFY", "EXPN", "QUIT"],
+        "help_noop": ["EHLO", "HELP", "NOOP", "QUIT"],
+        "bdat": ["EHLO", "MAIL", "RCPT", "BDAT", "QUIT"],
+        "reset": ["EHLO", "MAIL", "RSET", "QUIT"],
+        "etrn": ["EHLO", "ETRN", "QUIT"]
+    }
 
-    content = "import os\n\n"
-    content += "\n".join(all_ordered_funcs)
-    content += "\n\n"
-    content += smtp_gen_code
-    content += "\n"
-    content += "def main():\n"
-    content += '    with open("smtp_all.raw", "wb") as f:\n'
-    content += '        with open("/dev/urandom", "rb") as rng:\n'
-    content += '            __smtp_gen__(rng, f)\n'
-    content += "\nif __name__ == '__main__':\n    main()\n"
+    for flow_name, methods in SMTP_FLOWS.items():
+        flow_funcs_code = []
+        for i, method in enumerate(methods):
+            if method in KNOWN_SMTP_COMMANDS:
+                payload = KNOWN_SMTP_COMMANDS[method]
+                func_name = f"flow_{i:03d}_{method}"
+                func_code = f"def {func_name}(): return {repr(payload)}"
+                flow_funcs_code.append(func_code)
+        
+        if not flow_funcs_code:
+            continue
 
-    with open(smtp_all_path, "w") as f:
-        f.write(content)
+        py_filename = f"smtp_flow_{flow_name}.py"
+        py_filepath = os.path.join(output_dir, py_filename)
+        
+        content = "import os\n\n"
+        content += "\n".join(flow_funcs_code)
+        content += "\n\n"
+        content += smtp_gen_code
+        content += "\n"
+        content += "def main():\n"
+        content += f'    with open("{flow_name}.raw", "wb") as f:\n'
+        content += '        with open("/dev/urandom", "rb") as rng:\n'
+        content += '            __smtp_gen__(rng, f)\n'
+        content += "\nif __name__ == '__main__':\n    main()\n"
+
+        with open(py_filepath, "w") as f:
+            f.write(content)
+        # print(f"Generated {py_filepath}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
