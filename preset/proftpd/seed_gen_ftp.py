@@ -197,7 +197,7 @@ def generate_files(seeds_dir, output_dir):
             all_funcs_code_for_all_py.append(func_code)
             
         # Generate synthetic python file
-        py_filename = "ftp_seeds_synthetic.py"
+        py_filename = "ftp_synthetic.py"
         py_filepath = os.path.join(output_dir, py_filename)
         content = "import os\n\n"
         content += "\n".join(synthetic_funcs_code)

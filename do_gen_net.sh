@@ -161,8 +161,8 @@ for model_name in $MODELS ; do
             --input_seeds "${GOOUT}/${state_name}/" \
             --init_variants "${GVOUT}/${state_name}/"
         
-        count=$(find "${GVOUT}/${state_name}/" -name "*.py" | wc -l)
-        (echo "$count"; find "${GVOUT}/${state_name}/" -name "*.py") | python genoutputs_net.py \
+        count=$(find "${GVOUT}/${state_name}/" -name "${PROTOCOL_TYPE}_*.py" ! -name "*seed*" | wc -l)
+        (echo "$count"; find "${GVOUT}/${state_name}/" -name "${PROTOCOL_TYPE}_*.py" ! -name "*seed*") | python genoutputs_net.py \
             -L "${GOLOG}_init" \
             -O "${GOOUT}/${state_name}/" \
             -g "${prev_gen}"
