@@ -12,14 +12,25 @@ KNOWN_SMTP_COMMANDS = {
     
     # Authentication & Security
     "AUTH": b"AUTH PLAIN AHVidW50dQB1YnVudHU=\r\n", # \0ubuntu\0ubuntu
+    "AUTH_LOGIN": b"AUTH LOGIN\r\n",
+    "AUTH_USER_B64": b"dWJ1bnR1\r\n", # ubuntu
+    "AUTH_PASS_B64": b"dWJ1bnR1\r\n", # ubuntu
     "STARTTLS": b"STARTTLS\r\n",
     
     # Mail Transaction
     "MAIL": b"MAIL FROM:<ubuntu@ubuntu>\r\n",
+    "MAIL_SIZE": b"MAIL FROM:<ubuntu@ubuntu> SIZE=10240\r\n",
+    "MAIL_BODY": b"MAIL FROM:<ubuntu@ubuntu> BODY=8BITMIME\r\n",
     "RCPT": b"RCPT TO:<ubuntu@ubuntu>\r\n",
+    "RCPT_NOTIFY": b"RCPT TO:<ubuntu@ubuntu> NOTIFY=SUCCESS,FAILURE\r\n",
     "DATA": b"DATA\r\nFrom: ubuntu@ubuntu\r\nTo: ubuntu@ubuntu\r\nSubject: Fuzzing Test\r\nDate: Mon, 20 Dec 2025 10:00:00 +0000\r\nMessage-ID: <1234@ubuntu>\r\nX-Mailer: TDPFuzz\r\n\r\nThis is a test body for fuzzing.\r\nIt has multiple lines.\r\n.\r\n",
     "BDAT": b"BDAT 11 LAST\r\nHelloBDAT\r\n",
+    "BDAT_CHUNK": b"BDAT 5\r\nChunk\r\n",
+    "BDAT_LAST": b"BDAT 6 LAST\r\nFinish\r\n",
     
+    # Pipelining
+    "PIPE_MAIL_RCPT": b"MAIL FROM:<ubuntu@ubuntu>\r\nRCPT TO:<ubuntu@ubuntu>\r\n",
+
     # Reset & Verify
     "RSET": b"RSET\r\n",
     "VRFY": b"VRFY ubuntu\r\n",
@@ -34,8 +45,10 @@ KNOWN_SMTP_COMMANDS = {
 
 # Logical order for SMTP methods to maximize state transitions
 SMTP_METHOD_ORDER = [
-    "EHLO", "HELO", "STARTTLS", "AUTH",
-    "MAIL", "RCPT", "DATA", "BDAT",
+    "EHLO", "HELO", "STARTTLS", "AUTH", "AUTH_LOGIN",
+    "MAIL", "MAIL_SIZE", "MAIL_BODY", "PIPE_MAIL_RCPT",
+    "RCPT", "RCPT_NOTIFY",
+    "DATA", "BDAT", "BDAT_CHUNK", "BDAT_LAST",
     "RSET", "VRFY", "EXPN", "HELP", "NOOP",
     "QUIT"
 ]
@@ -239,11 +252,15 @@ def generate_files(seeds_dir, output_dir):
     # Generate valid business flow seeds
     SMTP_FLOWS = {
         "send_mail": ["EHLO", "MAIL", "RCPT", "DATA", "QUIT"],
-        "auth_send": ["EHLO", "AUTH", "MAIL", "RCPT", "DATA", "QUIT"],
+        "auth_plain_send": ["EHLO", "AUTH", "MAIL", "RCPT", "DATA", "QUIT"],
+        "auth_login_send": ["EHLO", "AUTH_LOGIN", "AUTH_USER_B64", "AUTH_PASS_B64", "MAIL", "RCPT", "DATA", "QUIT"],
         "starttls": ["EHLO", "STARTTLS", "EHLO", "QUIT"],
         "verify": ["EHLO", "VRFY", "EXPN", "QUIT"],
         "help_noop": ["EHLO", "HELP", "NOOP", "QUIT"],
         "bdat": ["EHLO", "MAIL", "RCPT", "BDAT", "QUIT"],
+        "chunking": ["EHLO", "MAIL", "RCPT", "BDAT_CHUNK", "BDAT_LAST", "QUIT"],
+        "pipelining": ["EHLO", "PIPE_MAIL_RCPT", "DATA", "QUIT"],
+        "params_test": ["EHLO", "MAIL_SIZE", "RCPT_NOTIFY", "DATA", "QUIT"],
         "reset": ["EHLO", "MAIL", "RSET", "QUIT"],
         "reset_transaction": ["EHLO", "MAIL", "RCPT", "RSET", "MAIL", "RCPT", "DATA", "QUIT"],
         "etrn": ["EHLO", "ETRN", "QUIT"]

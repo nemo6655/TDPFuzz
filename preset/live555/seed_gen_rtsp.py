@@ -8,7 +8,27 @@ KNOWN_RTSP_COMMANDS = {
     "OPTIONS": b"OPTIONS rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\n\r\n",
     "DESCRIBE": b"DESCRIBE rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n\r\n",
     "SETUP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37952-37953\r\n\r\n",
+    "SETUP_TCP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP/TCP;unicast;interleaved=0-1\r\n\r\n",
     "SETUP_MULTICAST": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;multicast;ttl=127\r\n\r\n",
+    
+    # AC3 Audio Test
+    "DESCRIBE_AC3": b"DESCRIBE rtsp://127.0.0.1:8554/ac3AudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n\r\n",
+    "SETUP_AC3": b"SETUP rtsp://127.0.0.1:8554/ac3AudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37954-37955\r\n\r\n",
+    "PLAY_AC3": b"PLAY rtsp://127.0.0.1:8554/ac3AudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n\r\n",
+    "TEARDOWN_AC3": b"TEARDOWN rtsp://127.0.0.1:8554/ac3AudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
+
+    # Matroska File Test
+    "DESCRIBE_MKV": b"DESCRIBE rtsp://127.0.0.1:8554/matroskaFileTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n\r\n",
+    "SETUP_MKV": b"SETUP rtsp://127.0.0.1:8554/matroskaFileTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37956-37957\r\n\r\n",
+    "PLAY_MKV": b"PLAY rtsp://127.0.0.1:8554/matroskaFileTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n\r\n",
+    "TEARDOWN_MKV": b"TEARDOWN rtsp://127.0.0.1:8554/matroskaFileTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
+
+    # WebM File Test
+    "DESCRIBE_WEBM": b"DESCRIBE rtsp://127.0.0.1:8554/webmFileTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n\r\n",
+    "SETUP_WEBM": b"SETUP rtsp://127.0.0.1:8554/webmFileTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37958-37959\r\n\r\n",
+    "PLAY_WEBM": b"PLAY rtsp://127.0.0.1:8554/webmFileTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n\r\n",
+    "TEARDOWN_WEBM": b"TEARDOWN rtsp://127.0.0.1:8554/webmFileTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
+
     "PLAY": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n\r\n",
     "PLAY_SCALE": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nScale: 2.0\r\n\r\n",
     "PAUSE": b"PAUSE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n\r\n",
@@ -166,6 +186,10 @@ def generate_files(seeds_dir, output_dir):
     # Generate valid business flow seeds
     RTSP_FLOWS = {
         "play_teardown": ["OPTIONS", "DESCRIBE", "SETUP", "PLAY", "TEARDOWN"],
+        "play_tcp": ["OPTIONS", "DESCRIBE", "SETUP_TCP", "PLAY", "TEARDOWN"],
+        "play_ac3": ["OPTIONS", "DESCRIBE_AC3", "SETUP_AC3", "PLAY_AC3", "TEARDOWN_AC3"],
+        "play_mkv": ["OPTIONS", "DESCRIBE_MKV", "SETUP_MKV", "PLAY_MKV", "TEARDOWN_MKV"],
+        "play_webm": ["OPTIONS", "DESCRIBE_WEBM", "SETUP_WEBM", "PLAY_WEBM", "TEARDOWN_WEBM"],
         "pause_play": ["OPTIONS", "DESCRIBE", "SETUP", "PLAY", "PAUSE", "PLAY", "TEARDOWN"],
         "fast_forward": ["OPTIONS", "DESCRIBE", "SETUP", "PLAY", "PLAY_SCALE", "TEARDOWN"],
         "multicast_stream": ["OPTIONS", "DESCRIBE", "SETUP_MULTICAST", "PLAY", "TEARDOWN"],

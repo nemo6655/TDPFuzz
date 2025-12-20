@@ -7,17 +7,20 @@ import sys
 # Standard SIP Methods (RFC 3261 and extensions)
 KNOWN_SIP_COMMANDS = {
     "INVITE": b"INVITE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-2\r\nFrom: sipp <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1:5060>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 INVITE\r\nContact: sip:30@127.0.0.1:5061\r\nMax-Forwards: 100\r\nContent-Type: application/sdp\r\nContent-Length: 129\r\n\r\nv=0\r\no=user1 53655765 2353687637 IN IP4 127.0.0.1\r\ns=-\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 6000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\n",
+    "INVITE_AUTH": b"INVITE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-3\r\nFrom: sipp <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1:5060>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 3 INVITE\r\nContact: sip:30@127.0.0.1:5061\r\nAuthorization: Digest username=\"30\", realm=\"127.0.0.1\", nonce=\"4b4b4b4b\", uri=\"sip:33@127.0.0.1:5060\", response=\"6629fae49393a05397450978507c4ef1\", algorithm=MD5\r\nMax-Forwards: 100\r\nContent-Type: application/sdp\r\nContent-Length: 129\r\n\r\nv=0\r\no=user1 53655765 2353687637 IN IP4 127.0.0.1\r\ns=-\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 6000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\n",
     "ACK": b"ACK sip:33@127.0.0.1:5068;ob SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-7\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nRoute: <sip:127.0.0.1;lr>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 ACK\r\nContact: sip:30@127.0.0.1:5061\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
     "BYE": b"BYE sip:33@127.0.0.1:5068;ob SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-9\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nRoute: <sip:127.0.0.1;lr>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 3 BYE\r\nContact: sip:sipp@127.0.0.1:5061\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
     "CANCEL": b"CANCEL sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-2\r\nFrom: sipp <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1:5060>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 CANCEL\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
     "REGISTER": b"REGISTER sip:127.0.0.1 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-0\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 REGISTER\r\nContact: sip:30@127.0.0.1:5061\r\nMax-Forwards: 100\r\nExpires: 120\r\nUser-Agent: SIPp/Win32\r\nContent-Length: 0\r\n\r\n",
     "REGISTER_AUTH": b"REGISTER sip:127.0.0.1 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-1\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 2 REGISTER\r\nContact: sip:30@127.0.0.1:5061\r\nAuthorization: Digest username=\"30\", realm=\"127.0.0.1\", nonce=\"4b4b4b4b\", uri=\"sip:127.0.0.1\", response=\"6629fae49393a05397450978507c4ef1\", algorithm=MD5\r\nMax-Forwards: 100\r\nExpires: 120\r\nUser-Agent: SIPp/Win32\r\nContent-Length: 0\r\n\r\n",
     "OPTIONS": b"OPTIONS sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-8\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 OPTIONS\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
+    "OPTIONS_NAT": b"OPTIONS sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-8\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 OPTIONS\r\nMax-Forwards: 100\r\nUser-Agent: SIPp/Win32\r\nContent-Length: 0\r\n\r\n",
     "INFO": b"INFO sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-9\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 3 INFO\r\nMax-Forwards: 100\r\nContent-Type: application/dtmf-relay\r\nContent-Length: 0\r\n\r\n",
     "PRACK": b"PRACK sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-10\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 4 PRACK\r\nRAck: 1 1 INVITE\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
     "SUBSCRIBE": b"SUBSCRIBE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-11\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 SUBSCRIBE\r\nEvent: presence\r\nExpires: 600\r\nContact: <sip:30@127.0.0.1:5061>\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
     "NOTIFY": b"NOTIFY sip:30@127.0.0.1:5061 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bK-670-1-12\r\nFrom: <sip:33@127.0.0.1>;tag=2\r\nTo: <sip:30@127.0.0.1>;tag=1\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 NOTIFY\r\nEvent: presence\r\nSubscription-State: active\r\nMax-Forwards: 100\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
     "PUBLISH": b"PUBLISH sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-13\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 PUBLISH\r\nEvent: presence\r\nExpires: 600\r\nMax-Forwards: 100\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
+    "PUBLISH_PRESENCE": b"PUBLISH sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-13\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 PUBLISH\r\nEvent: presence\r\nExpires: 600\r\nMax-Forwards: 100\r\nContent-Type: application/pidf+xml\r\nContent-Length: 0\r\n\r\n",
     "MESSAGE": b"MESSAGE sip:30@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-14\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 MESSAGE\r\nMax-Forwards: 100\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\nHello",
     "REFER": b"REFER sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-15\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 5 REFER\r\nRefer-To: <sip:other@127.0.0.1>\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
     "UPDATE": b"UPDATE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-16\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 6 UPDATE\r\nMax-Forwards: 100\r\nContent-Length: 0\r\n\r\n",
@@ -30,8 +33,8 @@ KNOWN_SIP_COMMANDS = {
 # 4. Session Manipulation (ACK, INFO, etc.)
 # 5. Session Teardown (BYE)
 METHOD_ORDER = [
-    "REGISTER", "SUBSCRIBE", "PUBLISH", "NOTIFY", "OPTIONS", "MESSAGE", # Non-session / Setup
-    "INVITE", "PRACK", "ACK", "UPDATE", "INFO", "REFER", "CANCEL",      # Active Session
+    "REGISTER", "REGISTER_AUTH", "SUBSCRIBE", "PUBLISH", "PUBLISH_PRESENCE", "NOTIFY", "OPTIONS", "OPTIONS_NAT", "MESSAGE", # Non-session / Setup
+    "INVITE", "INVITE_AUTH", "PRACK", "ACK", "UPDATE", "INFO", "REFER", "CANCEL",      # Active Session
     "BYE"                                                               # Teardown
 ]
 
@@ -176,10 +179,14 @@ def generate_files(seeds_dir, output_dir):
     SIP_FLOWS = {
         "register": ["REGISTER"],
         "register_auth": ["REGISTER", "REGISTER_AUTH"],
+        "register_call": ["REGISTER_AUTH", "INVITE_AUTH", "ACK", "BYE"],
         "invite_ack_bye": ["INVITE", "ACK", "BYE"],
+        "invite_auth_ack_bye": ["INVITE_AUTH", "ACK", "BYE"],
         "invite_cancel": ["INVITE", "CANCEL"],
         "options": ["OPTIONS"],
+        "nat_keepalive": ["OPTIONS_NAT", "OPTIONS_NAT"],
         "subscribe_notify": ["SUBSCRIBE", "NOTIFY"],
+        "presence": ["PUBLISH_PRESENCE", "SUBSCRIBE", "NOTIFY"],
         "message": ["MESSAGE"],
         "refer": ["INVITE", "ACK", "REFER", "BYE"],
         "info": ["INVITE", "ACK", "INFO", "BYE"],
