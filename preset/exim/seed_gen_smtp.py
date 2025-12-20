@@ -11,19 +11,19 @@ KNOWN_SMTP_COMMANDS = {
     "EHLO": b"EHLO localhost\r\n",
     
     # Authentication & Security
-    "AUTH": b"AUTH PLAIN\r\n",
+    "AUTH": b"AUTH PLAIN AHVidW50dQB1YnVudHU=\r\n", # \0ubuntu\0ubuntu
     "STARTTLS": b"STARTTLS\r\n",
     
     # Mail Transaction
     "MAIL": b"MAIL FROM:<ubuntu@ubuntu>\r\n",
     "RCPT": b"RCPT TO:<ubuntu@ubuntu>\r\n",
-    "DATA": b"DATA\r\nSubject: Test\r\n\r\nBody\r\n.\r\n",
-    "BDAT": b"BDAT 10 LAST\r\nHelloBDAT\r\n",
+    "DATA": b"DATA\r\nFrom: ubuntu@ubuntu\r\nTo: ubuntu@ubuntu\r\nSubject: Fuzzing Test\r\nDate: Mon, 20 Dec 2025 10:00:00 +0000\r\nMessage-ID: <1234@ubuntu>\r\nX-Mailer: TDPFuzz\r\n\r\nThis is a test body for fuzzing.\r\nIt has multiple lines.\r\n.\r\n",
+    "BDAT": b"BDAT 11 LAST\r\nHelloBDAT\r\n",
     
     # Reset & Verify
     "RSET": b"RSET\r\n",
-    "VRFY": b"VRFY user\r\n",
-    "EXPN": b"EXPN list\r\n",
+    "VRFY": b"VRFY ubuntu\r\n",
+    "EXPN": b"EXPN ubuntu\r\n",
     
     # Info & Control
     "HELP": b"HELP\r\n",
@@ -110,22 +110,52 @@ def generate_files(seeds_dir, output_dir):
         with open(raw_file, "rb") as f:
             content = f.read()
         
-        # Split by newline (handling \r\n or \n)
-        # SMTP is line based, but some commands like DATA have multi-line payload.
-        # For simplicity in initial seeds, we assume commands are separated by newlines
-        # or we treat the whole file as a sequence if it's complex.
-        # However, the previous logic splits by newlines.
-        # If we have DATA command, splitting by newline breaks the body.
-        # But for initial seeds analysis, we just want to find the commands.
-        # Let's stick to splitting by newline for analysis, but for reproduction
-        # we might need to be careful.
-        # Actually, the previous scripts split by double newline or single newline depending on protocol.
-        # SMTP commands are strictly line based ending in CRLF.
-        # But DATA body is terminated by CRLF.CRLF.
-        # Let's assume input seeds are simple one-command-per-line or properly separated.
-        # We'll split by simple newline for now to identify commands.
+
         
-        parts = re.split(b'(?:\r?\n)+', content.strip())
+        # Handle DATA command specially to preserve body
+        # Split by CRLF.CRLF first to isolate DATA blocks if possible, but standard seeds might not be formatted perfectly.
+        # A robust way is to iterate line by line and detect DATA state.
+        
+        parts = []
+        current_part = b""
+        in_data = False
+        
+        lines = re.split(b'(\r?\n)', content.strip())
+        # re.split with capturing group returns delimiters.
+        # lines will be [line1, delim1, line2, delim2, ...]
+        
+        for i in range(0, len(lines), 2):
+            line = lines[i]
+            delim = lines[i+1] if i+1 < len(lines) else b""
+            
+            if not line and not delim: continue
+            
+            full_line = line + delim
+            
+            if in_data:
+                current_part += full_line
+                if line.strip() == b".":
+                    in_data = False
+                    parts.append(current_part)
+                    current_part = b""
+            else:
+                # Check if this line is a DATA command
+                cmd = get_smtp_command(line)
+                if cmd == "DATA":
+                    in_data = True
+                    current_part += full_line
+                else:
+                    # Normal command, add as separate part
+                    if current_part:
+                        # Should not happen if logic is correct for non-DATA
+                        parts.append(current_part)
+                        current_part = b""
+                    parts.append(full_line)
+        
+        if current_part:
+            parts.append(current_part)
+
+        # Filter empty parts
         parts = [p for p in parts if p.strip()]
         
         file_funcs_code = []
@@ -141,7 +171,11 @@ def generate_files(seeds_dir, output_dir):
             func_name = re.sub(r'[^a-zA-Z0-9_]', '_', func_name)
             
             # Create one-line function
-            return_val = repr(part + b'\r\n')
+            # Ensure part ends with CRLF if it doesn't (though our split logic preserves delims)
+            if not part.endswith(b'\n'):
+                part += b'\r\n'
+                
+            return_val = repr(part)
             func_code = f"def {func_name}(): return {return_val}"
             
             file_funcs_code.append(func_code)
@@ -211,6 +245,7 @@ def generate_files(seeds_dir, output_dir):
         "help_noop": ["EHLO", "HELP", "NOOP", "QUIT"],
         "bdat": ["EHLO", "MAIL", "RCPT", "BDAT", "QUIT"],
         "reset": ["EHLO", "MAIL", "RSET", "QUIT"],
+        "reset_transaction": ["EHLO", "MAIL", "RCPT", "RSET", "MAIL", "RCPT", "DATA", "QUIT"],
         "etrn": ["EHLO", "ETRN", "QUIT"]
     }
 
