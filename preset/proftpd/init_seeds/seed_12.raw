@@ -1,5 +1,5 @@
-USER fuzzing
-PASS fuzzing
+USER ubuntu
+PASS ubuntu
 RNFR test.txt
 RNTO test2.txt
 LIST

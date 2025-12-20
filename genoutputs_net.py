@@ -119,7 +119,7 @@ def get_gentype(module_path):
     match = gentype_re.search(basename)
     if match:
         return match.group('gentype')
-    return "initial"
+    return "0initial"
 
 def generate_stats(logfile):
     color_preferences = {

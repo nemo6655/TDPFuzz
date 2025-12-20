@@ -112,7 +112,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
 
                 cmd = [
                     'docker', 'run', '-d', 
-                    '--cpus=3' if safe_job == '0000' else '--cpus=1',
+                    '--cpus=1',
                     '-v', f'{run_tmp}:/tmp',
                     image,
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 50'
