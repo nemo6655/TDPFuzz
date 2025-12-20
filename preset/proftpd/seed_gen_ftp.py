@@ -6,8 +6,8 @@ import sys
 
 KNOWN_COMMANDS = {
     # Access Control
-    "USER": b"USER fuzzing",
-    "PASS": b"PASS fuzzing",
+    "USER": b"USER ubuntu",
+    "PASS": b"PASS ubuntu",
     "ACCT": b"ACCT account",
     "CWD":  b"CWD /",
     "CDUP": b"CDUP",

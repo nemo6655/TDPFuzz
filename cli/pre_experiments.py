@@ -292,7 +292,7 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
                 os.remove(os.path.join(fuzzer_dir, file))
         datesuffix = datetime.now().strftime("%y%m%d")
         with tempfile.TemporaryDirectory() as tmpdir_raw:
-            result_name = f"{benchmark}_{datesuffix}.fuzzers"
+            result_name = f"{benchmark}_{datesuffix}"
             tmpdir = os.path.join(tmpdir_raw, result_name)
             os.makedirs(tmpdir, exist_ok=True)
             rundir_path = os.path.join(PROJECT_ROOT, rundir)

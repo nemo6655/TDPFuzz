@@ -1,5 +1,5 @@
-USER fuzzing
-PASS fuzzing
+USER ubuntu
+PASS ubuntu
 PASV
 LIST
 STAT
