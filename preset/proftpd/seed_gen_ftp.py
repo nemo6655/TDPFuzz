@@ -238,7 +238,16 @@ def generate_files(seeds_dir, output_dir):
         "mkdir_rmdir": ["USER", "PASS", "MKD", "CWD", "PWD", "CDUP", "RMD", "QUIT"],
         "rename_delete": ["USER", "PASS", "RNFR", "RNTO", "DELE", "QUIT"],
         "info": ["USER", "PASS", "SYST", "FEAT", "STAT", "HELP", "SITE", "SITE_CHMOD", "QUIT"],
-        "ipv6": ["USER", "PASS", "EPRT", "EPSV", "QUIT"]
+        "ipv6": ["USER", "PASS", "EPRT", "EPSV", "QUIT"],
+        "active_list": ["USER", "PASS", "PORT", "LIST", "QUIT"],
+        "abort_download": ["USER", "PASS", "PASV", "RETR_WELCOME", "ABOR", "QUIT"],
+        "append_upload": ["USER", "PASS", "TYPE", "PASV", "APPE", "QUIT"],
+        "unique_upload": ["USER", "PASS", "TYPE", "PASV", "STOU", "QUIT"],
+        "tls_login": ["AUTH", "PBSZ", "PROT", "USER", "PASS", "QUIT"],
+        "mlsd_list": ["USER", "PASS", "PASV", "MLSD", "QUIT"],
+        "opts_mlsd": ["USER", "PASS", "MLST", "PASV", "MLST", "QUIT"],
+        "proto_error_unauth": ["LIST", "QUIT"],
+        "rename_error": ["USER", "PASS", "RNTO", "QUIT"]
     }
 
     for flow_name, methods in FTP_FLOWS.items():

@@ -263,7 +263,15 @@ def generate_files(seeds_dir, output_dir):
         "params_test": ["EHLO", "MAIL_SIZE", "RCPT_NOTIFY", "DATA", "QUIT"],
         "reset": ["EHLO", "MAIL", "RSET", "QUIT"],
         "reset_transaction": ["EHLO", "MAIL", "RCPT", "RSET", "MAIL", "RCPT", "DATA", "QUIT"],
-        "etrn": ["EHLO", "ETRN", "QUIT"]
+        "etrn": ["EHLO", "ETRN", "QUIT"],
+        "helo_send": ["HELO", "MAIL", "RCPT", "DATA", "QUIT"],
+        "no_helo_mail": ["MAIL", "QUIT"],
+        "multi_rcpt": ["EHLO", "MAIL", "RCPT", "RCPT", "DATA", "QUIT"],
+        "data_abort": ["EHLO", "MAIL", "RCPT", "DATA", "RSET", "QUIT"],
+        "auth_fail": ["EHLO", "AUTH_LOGIN", "AUTH_USER_B64", "AUTH_PASS_B64", "QUIT"],
+        "auth_reset": ["EHLO", "AUTH", "RSET", "QUIT"],
+        "starttls_no_ehlo": ["EHLO", "STARTTLS", "MAIL", "QUIT"],
+        "quit_after_rcpt": ["EHLO", "MAIL", "RCPT", "QUIT"]
     }
 
     for flow_name, methods in SMTP_FLOWS.items():

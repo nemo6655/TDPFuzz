@@ -233,7 +233,15 @@ def generate_files(seeds_dir, output_dir):
         "api_playback_control": ["API-QUEUE", "API-PLAYBACK-PLAY", "API-VOLUME", "API-PLAYBACK-NEXT", "API-PLAYBACK-PAUSE", "API-PLAYBACK-STOP"],
         "api_library_manage": ["API-UPDATE", "API-LIBRARY", "API-SEARCH"],
         "api_queue_manage": ["API-QUEUE-CLEAR", "API-ADD-QUEUE", "API-QUEUE"],
-        "api_outputs": ["API-OUTPUTS"]
+        "api_outputs": ["API-OUTPUTS"],
+        "login_fail": ["SERVER-INFO", "LOGIN"],
+        "session_expire": ["SERVER-INFO", "LOGIN", "UPDATE", "DATABASES"],
+        "update_loop": ["SERVER-INFO", "LOGIN", "UPDATE", "UPDATE", "UPDATE"],
+        "database_revision_delta": ["SERVER-INFO", "LOGIN", "DATABASE-ITEMS", "UPDATE_DELTA"],
+        "container_items": ["SERVER-INFO", "LOGIN", "DATABASES", "DATABASE-CONTAINERS", "CONTAINER-ITEMS"],
+        "resolve_item": ["SERVER-INFO", "LOGIN", "DATABASES", "DATABASE-ITEMS", "RESOLVE"],
+        "stream_switch": [ "SERVER-INFO", "LOGIN", "DATABASE-ITEMS", "STREAM", "STREAM"],
+        "api_with_expired_session": ["API-QUEUE", "API-PLAYBACK-PLAY"]
     }
 
     for flow_name, methods in DAAP_FLOWS.items():
