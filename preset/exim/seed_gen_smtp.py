@@ -8,39 +8,39 @@ import sys
 KNOWN_SMTP_COMMANDS = {
     # Session Initiation
     "HELO": b"HELO localhost",
-    "EHLO": b"EHLO localhost\r\n",
+    "EHLO": b"EHLO localhost",
     
     # Authentication & Security
-    "AUTH": b"AUTH PLAIN AHVidW50dQB1YnVudHU=\r\n", # \0ubuntu\0ubuntu
-    "AUTH_LOGIN": b"AUTH LOGIN\r\n",
-    "AUTH_USER_B64": b"dWJ1bnR1\r\n", # ubuntu
-    "AUTH_PASS_B64": b"dWJ1bnR1\r\n", # ubuntu
-    "STARTTLS": b"STARTTLS\r\n",
+    "AUTH": b"AUTH PLAIN AHVidW50dQB1YnVudHU=", # \0ubuntu\0ubuntu
+    "AUTH_LOGIN": b"AUTH LOGIN",
+    "AUTH_USER_B64": b"dWJ1bnR1", # ubuntu
+    "AUTH_PASS_B64": b"dWJ1bnR1", # ubuntu
+    "STARTTLS": b"STARTTLS",
     
     # Mail Transaction
-    "MAIL": b"MAIL FROM:<ubuntu@ubuntu>\r\n",
-    "MAIL_SIZE": b"MAIL FROM:<ubuntu@ubuntu> SIZE=10240\r\n",
-    "MAIL_BODY": b"MAIL FROM:<ubuntu@ubuntu> BODY=8BITMIME\r\n",
-    "RCPT": b"RCPT TO:<ubuntu@ubuntu>\r\n",
-    "RCPT_NOTIFY": b"RCPT TO:<ubuntu@ubuntu> NOTIFY=SUCCESS,FAILURE\r\n",
-    "DATA": b"DATA\r\nFrom: ubuntu@ubuntu\r\nTo: ubuntu@ubuntu\r\nSubject: Fuzzing Test\r\nDate: Mon, 20 Dec 2025 10:00:00 +0000\r\nMessage-ID: <1234@ubuntu>\r\nX-Mailer: TDPFuzz\r\n\r\nThis is a test body for fuzzing.\r\nIt has multiple lines.\r\n.\r\n",
-    "BDAT": b"BDAT 11 LAST\r\nHelloBDAT\r\n",
-    "BDAT_CHUNK": b"BDAT 5\r\nChunk\r\n",
-    "BDAT_LAST": b"BDAT 6 LAST\r\nFinish\r\n",
+    "MAIL": b"MAIL FROM:<ubuntu@ubuntu>",
+    "MAIL_SIZE": b"MAIL FROM:<ubuntu@ubuntu> SIZE=10240",
+    "MAIL_BODY": b"MAIL FROM:<ubuntu@ubuntu> BODY=8BITMIME",
+    "RCPT": b"RCPT TO:<ubuntu@ubuntu>",
+    "RCPT_NOTIFY": b"RCPT TO:<ubuntu@ubuntu> NOTIFY=SUCCESS,FAILURE",
+    "DATA": b"DATA\r\nFrom: ubuntu@ubuntu\r\nTo: ubuntu@ubuntu\r\nSubject: Fuzzing Test\r\nDate: Mon, 20 Dec 2025 10:00:00 +0000\r\nMessage-ID: <1234@ubuntu>\r\nX-Mailer: TDPFuzz\r\nThis is a test body for fuzzing.\r\nIt has multiple lines.\r\n.",
+    "BDAT": b"BDAT 11 LAST\r\nHelloBDAT",
+    "BDAT_CHUNK": b"BDAT 5\r\nChunk",
+    "BDAT_LAST": b"BDAT 6 LAST\r\nFinish",
     
     # Pipelining
-    "PIPE_MAIL_RCPT": b"MAIL FROM:<ubuntu@ubuntu>\r\nRCPT TO:<ubuntu@ubuntu>\r\n",
+    "PIPE_MAIL_RCPT": b"MAIL FROM:<ubuntu@ubuntu>\r\nRCPT TO:<ubuntu@ubuntu>",
 
     # Reset & Verify
-    "RSET": b"RSET\r\n",
-    "VRFY": b"VRFY ubuntu\r\n",
-    "EXPN": b"EXPN ubuntu\r\n",
+    "RSET": b"RSET",
+    "VRFY": b"VRFY ubuntu",
+    "EXPN": b"EXPN ubuntu",
     
     # Info & Control
-    "HELP": b"HELP\r\n",
-    "NOOP": b"NOOP\r\n",
-    "ETRN": b"ETRN example.com\r\n",
-    "QUIT": b"QUIT\r\n",
+    "HELP": b"HELP",
+    "NOOP": b"NOOP",
+    "ETRN": b"ETRN example.com",
+    "QUIT": b"QUIT",
 }
 
 # Logical order for SMTP methods to maximize state transitions
