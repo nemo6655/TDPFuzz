@@ -16,7 +16,7 @@ strstr() {
 if $(strstr $FUZZER "afl"); then
 
   TARGET_DIR=${TARGET_DIR:-"exim"}
-  INPUTS=${WORKDIR}/in-smtp
+  # INPUTS=${WORKDIR}/in-smtp
 
   # Run fuzzer-specific commands (if any)
   if [ -e ${WORKDIR}/run-${FUZZER} ]; then

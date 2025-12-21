@@ -7,36 +7,47 @@ import sys
 # DAAP (DMAP) and JSON API Commands
 KNOWN_DAAP_COMMANDS = {
     # DAAP Protocol (DMAP)
-    "SERVER-INFO": b"GET /server-info HTTP/1.1\r\nHost: 127.0.0.1\r\nViewer-Only-Client: 1\r\n\r\n",
-    "CONTENT-CODES": b"GET /content-codes HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "LOGIN": b"GET /login HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "UPDATE": b"GET /update?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "DATABASES": b"GET /databases?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "DATABASE-ITEMS": b"GET /databases/1/items?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "DATABASE-CONTAINERS": b"GET /databases/1/containers?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "RESOLVE": b"GET /resolve?session-id=1&revision-number=1&path=/ HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "LOGOUT": b"GET /logout?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "STREAM": b"GET /databases/1/items/123.mp3?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+    "SERVER-INFO": b"GET /server-info HTTP/1.1\r\nHost: 127.0.0.1\r\nViewer-Only-Client: 1\r\n",
+    "CONTENT-CODES": b"GET /content-codes HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "LOGIN": b"GET /login HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "UPDATE": b"GET /update?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "DATABASES": b"GET /databases?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "DATABASE-ITEMS": b"GET /databases/1/items?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "DATABASE-CONTAINERS": b"GET /databases/1/containers?session-id=1&revision-number=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "RESOLVE": b"GET /resolve?session-id=1&revision-number=1&path=/ HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "LOGOUT": b"GET /logout?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "STREAM": b"GET /databases/1/items/123.mp3?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "ACTIVITY": b"GET /activity?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "CTRL-INT": b"GET /ctrl-int/1/playpause?session-id=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
     
     # JSON API (forked-daapd specific)
-    "API-CONFIG": b"GET /api/config HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-LIBRARY": b"GET /api/library/artists?media_kind=music HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-PLAYBACK": b"PUT /api/player/play HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n\r\n",
-    "API-QUEUE": b"GET /api/queue HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-OUTPUTS": b"GET /api/outputs HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-SPOTIFY": b"GET /api/spotify HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-SEARCH": b"GET /api/search?type=album&expression=time_added+after+8+weeks+ago+and+media_kind+is+music+having+track_count+%3E+3+order+by+time_added+desc&limit=3 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-ARTIST-DETAILS": b"GET /api/library/artists/6812574504550889270 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-ALBUM-DETAILS": b"GET /api/library/albums/7888021095875713269 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-ARTWORK": b"GET /artwork/group/6?maxwidth=600&maxheight=600 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    "API-ADD-QUEUE": b"POST /api/queue/items/add?uris=library:track:6 HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n\r\n",
+    "API-CONFIG": b"GET /api/config HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-LIBRARY": b"GET /api/library/artists?media_kind=music HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-PLAYBACK-PLAY": b"PUT /api/player/play HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-PLAYBACK-PAUSE": b"PUT /api/player/pause HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-PLAYBACK-STOP": b"PUT /api/player/stop HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-PLAYBACK-NEXT": b"PUT /api/player/next HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-PLAYBACK-PREV": b"PUT /api/player/previous HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-VOLUME": b"PUT /api/player/volume?volume=50 HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-QUEUE": b"GET /api/queue HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-QUEUE-CLEAR": b"PUT /api/queue/clear HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-OUTPUTS": b"GET /api/outputs HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-UPDATE": b"PUT /api/update HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
+    "API-SPOTIFY": b"GET /api/spotify HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-SEARCH": b"GET /api/search?type=album&expression=time_added+after+8+weeks+ago+and+media_kind+is+music+having+track_count+%3E+3+order+by+time_added+desc&limit=3 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-ARTIST-DETAILS": b"GET /api/library/artists/6812574504550889270 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-ALBUM-DETAILS": b"GET /api/library/albums/7888021095875713269 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-ARTWORK": b"GET /artwork/group/6?maxwidth=600&maxheight=600 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    "API-ADD-QUEUE": b"POST /api/queue/items/add?uris=library:track:6 HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n",
 }
 
 # Logical order for DAAP methods to maximize state transitions
 DAAP_METHOD_ORDER = [
     "SERVER-INFO", "CONTENT-CODES", "LOGIN", "UPDATE", 
-    "DATABASES", "DATABASE-ITEMS", "DATABASE-CONTAINERS", "RESOLVE",
-    "API-CONFIG", "API-OUTPUTS", "API-LIBRARY", "API-QUEUE", "API-PLAYBACK",
+    "DATABASES", "DATABASE-ITEMS", "DATABASE-CONTAINERS", "RESOLVE", "ACTIVITY",
+    "API-CONFIG", "API-OUTPUTS", "API-LIBRARY", "API-QUEUE", 
+    "API-PLAYBACK-PLAY", "API-PLAYBACK-PAUSE", "API-PLAYBACK-STOP", "API-PLAYBACK-NEXT", "API-PLAYBACK-PREV",
+    "API-VOLUME", "API-UPDATE"
 ]
 
 def get_daap_command(payload):
@@ -58,12 +69,21 @@ def get_daap_command(payload):
             if path.startswith('/databases'): return "DATABASES"
             if path.startswith('/resolve'): return "RESOLVE"
             if path.startswith('/logout'): return "LOGOUT"
+            if path.startswith('/activity'): return "ACTIVITY"
+            if path.startswith('/ctrl-int'): return "CTRL-INT"
             
             if path.startswith('/api/config'): return "API-CONFIG"
             if path.startswith('/api/library'): return "API-LIBRARY"
-            if path.startswith('/api/player'): return "API-PLAYBACK"
+            if path.startswith('/api/player/play'): return "API-PLAYBACK-PLAY"
+            if path.startswith('/api/player/pause'): return "API-PLAYBACK-PAUSE"
+            if path.startswith('/api/player/stop'): return "API-PLAYBACK-STOP"
+            if path.startswith('/api/player/next'): return "API-PLAYBACK-NEXT"
+            if path.startswith('/api/player/previous'): return "API-PLAYBACK-PREV"
+            if path.startswith('/api/player/volume'): return "API-VOLUME"
+            if path.startswith('/api/queue/clear'): return "API-QUEUE-CLEAR"
             if path.startswith('/api/queue'): return "API-QUEUE"
             if path.startswith('/api/outputs'): return "API-OUTPUTS"
+            if path.startswith('/api/update'): return "API-UPDATE"
             
             # Fallback for other API calls
             if path.startswith('/api/'): return "API-OTHER"
@@ -107,11 +127,11 @@ def generate_files(seeds_dir, output_dir):
     daap_gen_code += "                f.write(func())\n"
     daap_gen_code += "                # Add separator between requests\n"
     daap_gen_code += "                if i < len(funcs) - 1:\n"
-    daap_gen_code += "                    f.write(b'\\r\\n\\r\\n')\n"
+    daap_gen_code += "                    f.write(b'\\r\\n')\n"
     daap_gen_code += "            except Exception:\n"
     daap_gen_code += "                pass\n"
     daap_gen_code += "        # Ensure file ends with newline\n"
-    daap_gen_code += "        f.write(b'\\r\\n\\r\\n')\n"
+    daap_gen_code += "        f.write(b'\\r\\n')\n"
     daap_gen_code += "    except Exception:\n"
     daap_gen_code += "        pass\n"
 
@@ -208,9 +228,12 @@ def generate_files(seeds_dir, output_dir):
         "resolve": ["SERVER-INFO", "LOGIN", "RESOLVE"],
         "logout": ["SERVER-INFO", "LOGIN", "LOGOUT"],
         "stream_playback": ["SERVER-INFO", "LOGIN", "DATABASES", "DATABASE-ITEMS", "STREAM"],
+        "activity_monitor": ["SERVER-INFO", "LOGIN", "ACTIVITY"],
         "api_config": ["API-CONFIG"],
-        "api_playback": ["API-QUEUE", "API-PLAYBACK", "API-OUTPUTS"],
-        "api_library": ["API-LIBRARY"]
+        "api_playback_control": ["API-QUEUE", "API-PLAYBACK-PLAY", "API-VOLUME", "API-PLAYBACK-NEXT", "API-PLAYBACK-PAUSE", "API-PLAYBACK-STOP"],
+        "api_library_manage": ["API-UPDATE", "API-LIBRARY", "API-SEARCH"],
+        "api_queue_manage": ["API-QUEUE-CLEAR", "API-ADD-QUEUE", "API-QUEUE"],
+        "api_outputs": ["API-OUTPUTS"]
     }
 
     for flow_name, methods in DAAP_FLOWS.items():

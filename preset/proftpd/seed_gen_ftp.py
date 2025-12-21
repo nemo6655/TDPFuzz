@@ -8,6 +8,8 @@ KNOWN_COMMANDS = {
     # Access Control
     "USER": b"USER ubuntu",
     "PASS": b"PASS ubuntu",
+    "USER_ANON": b"USER ftp",
+    "PASS_ANON": b"PASS mozilla@example.com",
     "ACCT": b"ACCT account",
     "CWD":  b"CWD /",
     "CDUP": b"CDUP",
@@ -21,7 +23,9 @@ KNOWN_COMMANDS = {
     "STRU": b"STRU F",
     "MODE": b"MODE S",
     # FTP Service
-    "RETR": b"RETR test.txt",
+    "RETR": b"RETR welcome.msg",
+    "RETR_WELCOME": b"RETR welcome.msg",
+    "RETR_TEST": b"RETR test.txt",
     "STOR": b"STOR test.txt",
     "STOU": b"STOU test.txt",
     "APPE": b"APPE test.txt",
@@ -45,8 +49,12 @@ KNOWN_COMMANDS = {
     # Extensions
     "FEAT": b"FEAT",
     "OPTS": b"OPTS UTF8 ON",
-    "MDTM": b"MDTM 20200101000000 test.txt",
-    "SIZE": b"SIZE test.txt",
+    "MDTM": b"MDTM 20200101000000 welcome.msg",
+    "MDTM_WELCOME": b"MDTM 20200101000000 welcome.msg",
+    "MDTM_TEST": b"MDTM 20200101000000 test.txt",
+    "SIZE": b"SIZE welcome.msg",
+    "SIZE_WELCOME": b"SIZE welcome.msg",
+    "SIZE_TEST": b"SIZE test.txt",
     "MLST": b"MLST /",
     "MLSD": b"MLSD /",
     # IPv6
@@ -215,10 +223,18 @@ def generate_files(seeds_dir, output_dir):
 
     # Generate valid business flow seeds
     FTP_FLOWS = {
+        "anon_login_list": ["USER_ANON", "PASS_ANON", "PASV", "LIST", "QUIT"],
+        "anon_download_welcome": ["USER_ANON", "PASS_ANON", "TYPE", "PASV", "RETR_WELCOME", "QUIT"],
+        "anon_download_test": ["USER_ANON", "PASS_ANON", "TYPE", "PASV", "RETR_TEST", "QUIT"],
+        "anon_info": ["USER_ANON", "PASS_ANON", "SYST", "FEAT", "STAT", "HELP", "QUIT"],
+        "anon_site_chmod_deny": ["USER_ANON", "PASS_ANON", "SITE_CHMOD", "QUIT"],
+        "anon_write_deny": ["USER_ANON", "PASS_ANON", "STOR", "QUIT"],
         "login_list": ["USER", "PASS", "PASV", "LIST", "QUIT"],
         "upload": ["USER", "PASS", "TYPE", "PASV", "STOR", "QUIT"],
-        "download": ["USER", "PASS", "TYPE", "PASV", "RETR", "QUIT"],
-        "resume_download": ["USER", "PASS", "TYPE", "PASV", "REST", "RETR", "QUIT"],
+        "download_welcome": ["USER", "PASS", "TYPE", "PASV", "RETR_WELCOME", "QUIT"],
+        "download_test": ["USER", "PASS", "TYPE", "PASV", "RETR_TEST", "QUIT"],
+        "resume_download_welcome": ["USER", "PASS", "TYPE", "PASV", "REST", "RETR_WELCOME", "QUIT"],
+        "resume_download_test": ["USER", "PASS", "TYPE", "PASV", "REST", "RETR_TEST", "QUIT"],
         "mkdir_rmdir": ["USER", "PASS", "MKD", "CWD", "PWD", "CDUP", "RMD", "QUIT"],
         "rename_delete": ["USER", "PASS", "RNFR", "RNTO", "DELE", "QUIT"],
         "info": ["USER", "PASS", "SYST", "FEAT", "STAT", "HELP", "SITE", "SITE_CHMOD", "QUIT"],

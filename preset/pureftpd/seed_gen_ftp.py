@@ -8,6 +8,8 @@ KNOWN_COMMANDS = {
     # Access Control
     "USER": b"USER fuzzing",
     "PASS": b"PASS fuzzing",
+    "USER_ANON": b"USER anonymous",
+    "PASS_ANON": b"PASS test@example.com",
     "ACCT": b"ACCT account",
     "CWD":  b"CWD /",
     "CDUP": b"CDUP",
@@ -38,6 +40,9 @@ KNOWN_COMMANDS = {
     "NLST": b"NLST",
     "SITE": b"SITE HELP",
     "SITE_CHMOD": b"SITE CHMOD 777 test.txt",
+    "SITE_UTIME": b"SITE UTIME 20200101000000 test.txt",
+    "SITE_IDLE": b"SITE IDLE 300",
+    "SITE_QUOTA": b"SITE QUOTA",
     "SYST": b"SYST",
     "STAT": b"STAT",
     "HELP": b"HELP",
@@ -61,7 +66,7 @@ KNOWN_COMMANDS = {
 # Logical order for FTP methods to maximize state transitions
 FTP_METHOD_ORDER = [
     # Authentication
-    "USER", "PASS", "ACCT", "AUTH", "PBSZ", "PROT",
+    "USER", "USER_ANON", "PASS", "PASS_ANON", "ACCT", "AUTH", "PBSZ", "PROT",
     # Negotiation & Settings
     "SYST", "FEAT", "OPTS", "TYPE", "STRU", "MODE",
     # Navigation
@@ -75,7 +80,7 @@ FTP_METHOD_ORDER = [
     # File Ops
     "RNFR", "RNTO", "DELE", "RMD", "MKD", "SIZE", "MDTM",
     # Misc
-    "SITE", "HELP", "NOOP", "STAT",
+    "SITE", "SITE_CHMOD", "SITE_UTIME", "SITE_IDLE", "SITE_QUOTA", "HELP", "NOOP", "STAT",
     # Exit
     "QUIT", "ABOR"
 ]
@@ -220,12 +225,16 @@ def generate_files(seeds_dir, output_dir):
     # Generate valid business flow seeds
     FTP_FLOWS = {
         "login_list": ["USER", "PASS", "PASV", "LIST", "QUIT"],
+        "anon_login_list": ["USER_ANON", "PASS_ANON", "PASV", "LIST", "QUIT"],
         "upload": ["USER", "PASS", "TYPE", "PASV", "STOR", "QUIT"],
+        "anon_upload": ["USER_ANON", "PASS_ANON", "TYPE", "PASV", "STOR", "QUIT"],
         "download": ["USER", "PASS", "TYPE", "PASV", "RETR", "QUIT"],
         "resume_download": ["USER", "PASS", "TYPE", "PASV", "REST", "RETR", "QUIT"],
         "mkdir_rmdir": ["USER", "PASS", "MKD", "CWD", "PWD", "CDUP", "RMD", "QUIT"],
         "rename_delete": ["USER", "PASS", "RNFR", "RNTO", "DELE", "QUIT"],
-        "info": ["USER", "PASS", "SYST", "FEAT", "STAT", "HELP", "SITE", "SITE_CHMOD", "QUIT"],
+        "info": ["USER", "PASS", "SYST", "FEAT", "STAT", "HELP", "SITE", "QUIT"],
+        "site_commands": ["USER", "PASS", "SITE_CHMOD", "SITE_UTIME", "SITE_IDLE", "SITE_QUOTA", "QUIT"],
+        "tls_handshake": ["AUTH", "PBSZ", "PROT", "USER", "PASS", "QUIT"],
         "ipv6": ["USER", "PASS", "EPRT", "EPSV", "QUIT"]
     }
 
