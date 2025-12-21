@@ -5,39 +5,39 @@ import argparse
 import sys
 
 KNOWN_RTSP_COMMANDS = {
-    "OPTIONS": b"OPTIONS rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\n",
-    "DESCRIBE": b"DESCRIBE rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n",
-    "SETUP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37952-37953\r\n",
-    "SETUP_TCP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP/TCP;unicast;interleaved=0-1\r\n",
-    "SETUP_MULTICAST": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;multicast;ttl=127\r\n",
+    "OPTIONS": b"OPTIONS rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)",
+    "DESCRIBE": b"DESCRIBE rtsp://127.0.0.1:8554/wavAudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp",
+    "SETUP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37952-37953",
+    "SETUP_TCP": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP/TCP;unicast;interleaved=0-1",
+    "SETUP_MULTICAST": b"SETUP rtsp://127.0.0.1:8554/wavAudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;multicast;ttl=127",
     
     # AC3 Audio Test
-    "DESCRIBE_AC3": b"DESCRIBE rtsp://127.0.0.1:8554/ac3AudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n",
-    "SETUP_AC3": b"SETUP rtsp://127.0.0.1:8554/ac3AudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37954-37955\r\n",
-    "PLAY_AC3": b"PLAY rtsp://127.0.0.1:8554/ac3AudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n",
-    "TEARDOWN_AC3": b"TEARDOWN rtsp://127.0.0.1:8554/ac3AudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n",
+    "DESCRIBE_AC3": b"DESCRIBE rtsp://127.0.0.1:8554/ac3AudioTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp",
+    "SETUP_AC3": b"SETUP rtsp://127.0.0.1:8554/ac3AudioTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37954-37955",
+    "PLAY_AC3": b"PLAY rtsp://127.0.0.1:8554/ac3AudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-",
+    "TEARDOWN_AC3": b"TEARDOWN rtsp://127.0.0.1:8554/ac3AudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8",
 
     # Matroska File Test
-    "DESCRIBE_MKV": b"DESCRIBE rtsp://127.0.0.1:8554/matroskaFileTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n",
-    "SETUP_MKV": b"SETUP rtsp://127.0.0.1:8554/matroskaFileTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37956-37957\r\n",
-    "PLAY_MKV": b"PLAY rtsp://127.0.0.1:8554/matroskaFileTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n",
-    "TEARDOWN_MKV": b"TEARDOWN rtsp://127.0.0.1:8554/matroskaFileTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n",
+    "DESCRIBE_MKV": b"DESCRIBE rtsp://127.0.0.1:8554/matroskaFileTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp",
+    "SETUP_MKV": b"SETUP rtsp://127.0.0.1:8554/matroskaFileTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37956-37957",
+    "PLAY_MKV": b"PLAY rtsp://127.0.0.1:8554/matroskaFileTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-",
+    "TEARDOWN_MKV": b"TEARDOWN rtsp://127.0.0.1:8554/matroskaFileTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8",
 
     # WebM File Test
-    "DESCRIBE_WEBM": b"DESCRIBE rtsp://127.0.0.1:8554/webmFileTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp\r\n",
-    "SETUP_WEBM": b"SETUP rtsp://127.0.0.1:8554/webmFileTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37958-37959\r\n",
-    "PLAY_WEBM": b"PLAY rtsp://127.0.0.1:8554/webmFileTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n",
-    "TEARDOWN_WEBM": b"TEARDOWN rtsp://127.0.0.1:8554/webmFileTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n",
+    "DESCRIBE_WEBM": b"DESCRIBE rtsp://127.0.0.1:8554/webmFileTest RTSP/1.0\r\nCSeq: 2\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nAccept: application/sdp",
+    "SETUP_WEBM": b"SETUP rtsp://127.0.0.1:8554/webmFileTest/track1 RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nTransport: RTP/AVP;unicast;client_port=37958-37959",
+    "PLAY_WEBM": b"PLAY rtsp://127.0.0.1:8554/webmFileTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-",
+    "TEARDOWN_WEBM": b"TEARDOWN rtsp://127.0.0.1:8554/webmFileTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8",
 
-    "PLAY": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n",
-    "PLAY_SCALE": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nScale: 2.0\r\n",
-    "PAUSE": b"PAUSE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n",
-    "TEARDOWN": b"TEARDOWN rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n",
-    "GET_PARAMETER": b"GET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 7\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\n",
-    "SET_PARAMETER": b"SET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 8\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nContent-Type: text/parameters\r\nContent-Length: 12\r\n\r\nparam: value",
-    "ANNOUNCE": b"ANNOUNCE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 9\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nContent-Type: application/sdp\r\nContent-Length: 20\r\n\r\nv=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=No Name\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\na=tool:libavformat 58.29.100\r\nm=audio 0 RTP/AVP 10\r\nb=AS:128\r\n",
-    "RECORD": b"RECORD rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 10\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-\r\n",
-    "REDIRECT": b"REDIRECT rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 11\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nLocation: rtsp://127.0.0.1:8554/wavAudioTestNew/\r\n",
+    "PLAY": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 4\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-",
+    "PLAY_SCALE": b"PLAY rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nScale: 2.0",
+    "PAUSE": b"PAUSE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 5\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8",
+    "TEARDOWN": b"TEARDOWN rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 6\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8",
+    "GET_PARAMETER": b"GET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 7\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8",
+    "SET_PARAMETER": b"SET_PARAMETER rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 8\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nContent-Type: text/parameters\r\nContent-Length: 12\r\nparam: value",
+    "ANNOUNCE": b"ANNOUNCE rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 9\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nContent-Type: application/sdp\r\nContent-Length: 20\r\n\r\nv=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=No Name\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\na=tool:libavformat 58.29.100\r\nm=audio 0 RTP/AVP 10\r\nb=AS:128",
+    "RECORD": b"RECORD rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 10\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nSession: 000022B8\r\nRange: npt=0.000-",
+    "REDIRECT": b"REDIRECT rtsp://127.0.0.1:8554/wavAudioTest/ RTSP/1.0\r\nCSeq: 11\r\nUser-Agent: ./testRTSPClient (LIVE555 Streaming Media v2018.08.28)\r\nLocation: rtsp://127.0.0.1:8554/wavAudioTestNew/",
 }
 
 # Logical order for RTSP methods to maximize state transitions
@@ -195,7 +195,15 @@ def generate_files(seeds_dir, output_dir):
         "multicast_stream": ["OPTIONS", "DESCRIBE", "SETUP_MULTICAST", "PLAY", "TEARDOWN"],
         "record": ["OPTIONS", "ANNOUNCE", "SETUP", "RECORD", "TEARDOWN"],
         "get_set_param": ["OPTIONS", "DESCRIBE", "SETUP", "GET_PARAMETER", "SET_PARAMETER", "TEARDOWN"],
-        "redirect": ["OPTIONS", "DESCRIBE", "REDIRECT"]
+        "redirect": ["OPTIONS", "DESCRIBE", "REDIRECT"],
+        "keepalive_play": [ "OPTIONS", "DESCRIBE", "SETUP", "PLAY",  "GET_PARAMETER", "GET_PARAMETER",  "TEARDOWN"],
+        "invalid_play": [  "OPTIONS", "PLAY"],
+        "invalid_pause": [  "OPTIONS", "DESCRIBE", "SETUP", "PAUSE"],
+        "teardown_replay": [  "OPTIONS", "DESCRIBE", "SETUP", "PLAY",  "TEARDOWN", "PLAY"],
+        "multi_setup_tracks": [  "OPTIONS", "DESCRIBE",  "SET_PARAMETER", "SET_PARAMETER",  "PLAY", "TEARDOWN"],
+        "sessionless_control": [  "OPTIONS", "GET_PARAMETER", "DESCRIBE"],
+        "record_pause": [  "OPTIONS", "ANNOUNCE", "SETUP", "RECORD", "PAUSE", "TEARDOWN"],
+        "setup_reentry": [ "OPTIONS", "DESCRIBE", "SETUP", "SETUP_TCP",  "PLAY", "TEARDOWN"]
     }
 
     for flow_name, methods in RTSP_FLOWS.items():

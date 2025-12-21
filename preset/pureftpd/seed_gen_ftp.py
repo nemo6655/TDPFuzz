@@ -235,7 +235,11 @@ def generate_files(seeds_dir, output_dir):
         "info": ["USER", "PASS", "SYST", "FEAT", "STAT", "HELP", "SITE", "QUIT"],
         "site_commands": ["USER", "PASS", "SITE_CHMOD", "SITE_UTIME", "SITE_IDLE", "SITE_QUOTA", "QUIT"],
         "tls_handshake": ["AUTH", "PBSZ", "PROT", "USER", "PASS", "QUIT"],
-        "ipv6": ["USER", "PASS", "EPRT", "EPSV", "QUIT"]
+        "ipv6": ["USER", "PASS", "EPRT", "EPSV", "QUIT"],
+        # "auth_fail":["USER", "PASS_WRONG", "PASS_WRONG", "QUIT"],
+        "proto_error": ["LIST", "QUIT"],
+        "active_mode": ["USER", "PASS", "PORT", "LIST", "QUIT"],
+        "abort_transfer": ["USER", "PASS", "PASV", "RETR", "ABOR", "QUIT"]
     }
 
     for flow_name, methods in FTP_FLOWS.items():

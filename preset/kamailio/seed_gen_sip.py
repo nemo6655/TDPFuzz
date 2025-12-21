@@ -24,6 +24,7 @@ KNOWN_SIP_COMMANDS = {
     "MESSAGE": b"MESSAGE sip:30@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-14\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:30@127.0.0.1>\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 MESSAGE\r\nMax-Forwards: 100\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\nHello",
     "REFER": b"REFER sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-15\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 5 REFER\r\nRefer-To: <sip:other@127.0.0.1>\r\nMax-Forwards: 100\r\nContent-Length: 0",
     "UPDATE": b"UPDATE sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-16\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 6 UPDATE\r\nMax-Forwards: 100\r\nContent-Length: 0",
+    "RINGING_180": b"RINGING sip:33@127.0.0.1:5060 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-17\r\nFrom: <sip:30@127.0.0.1>;tag=1\r\nTo: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV\r\nCall-ID: 1-670@127.0.0.1\r\nCSeq: 1 INVITE\r\nMax-Forwards: 70\r\nUser-Agent: SIPp/Win32\r\nContent-Length: 0"
 }
 
 # Logical order for SIP methods to maximize state transitions
@@ -190,7 +191,17 @@ def generate_files(seeds_dir, output_dir):
         "message": ["MESSAGE"],
         "refer": ["INVITE", "ACK", "REFER", "BYE"],
         "info": ["INVITE", "ACK", "INFO", "BYE"],
-        "update": ["INVITE", "UPDATE", "ACK", "BYE"]
+        "update": ["INVITE", "UPDATE", "ACK", "BYE"],
+        "invite_early_dialog": ["INVITE", "RINGING_180", "CANCEL"],
+        # "invite_fail_busy": [  "INVITE", "486_BUSY"],
+        # "invite_redirect": [  "INVITE", "302_REDIRECT", "INVITE_REDIRECT"],
+        "reinvite": [  "INVITE", "ACK", "INVITE", "ACK", "BYE"],
+        "session_timer_refresh": [  "INVITE", "ACK", "UPDATE_REFRESH", "BYE"],
+        "bye_before_ack": [  "INVITE", "BYE"],
+        "register_expire_refresh": [  "REGISTER_AUTH", "REGISTER"],
+        "subscribe_refresh": [  "SUBSCRIBE", "NOTIFY", "SUBSCRIBE", "NOTIFY"],
+        "subscribe_terminate": [  "SUBSCRIBE", "NOTIFY", "NOTIFY"],
+        "options_dialog": [  "INVITE", "ACK", "OPTIONS", "BYE"]
     }
 
     for flow_name, methods in SIP_FLOWS.items():
