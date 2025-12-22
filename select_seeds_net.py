@@ -200,7 +200,8 @@ def extract_state_pseudo_edges(filename: str) -> set[str]:
 @click.option('--output-elite-file', '-o', 'output_elite_file', type=click.Path(writable=True, dir_okay=False), help='Elite seeds file')
 @click.option('--baseline', '-b', type=click.Path(exists=False), default=None)
 @click.option('--use-ilp', '-u', is_flag=True, help='Use ILP to find the minimum set of seeds covering all edges')
-def main(generation: str, current_covfile, max_elites: int, input_elite_file, output_elite_file, baseline, use_ilp):
+@click.option('--rescue-missing', '-r', is_flag=True, help='Rescue missing edges after ILP using greedy set cover',default=True)
+def main(generation: str, current_covfile, max_elites: int, input_elite_file, output_elite_file, baseline, use_ilp, rescue_missing):
     if generation.startswith('gen'):
         try:
             gen_num = int(generation[3:])
@@ -660,23 +661,24 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
                 f.write(f"{key}: {len(edges)} edges, size {size}\n")
             
         # Hybrid Strategy: Fill up to max_elites
-        if len(ilp_selected) < max_elites:
-            print(f"ILP selected {len(ilp_selected)} seeds. Filling up to {max_elites}...", file=sys.stderr)
-            selected_keys = set(k for k, _, _ in ilp_selected)
+        if rescue_missing:
+            if len(ilp_selected) < max_elites:
+                print(f"ILP selected {len(ilp_selected)} seeds. Filling up to {max_elites}...", file=sys.stderr)
+                selected_keys = set(k for k, _, _ in ilp_selected)
+                
+                # Sort remaining candidates by coverage size (descending)
+                remaining = []
+                for key, edges, size in candidates:
+                    if key not in selected_keys:
+                        remaining.append((key, edges, size))
+                
+                remaining.sort(key=lambda x: len(x[1]), reverse=True)
+                
+                # Add top remaining seeds
+                num_to_add = max_elites - len(ilp_selected)
+                for i in range(min(num_to_add, len(remaining))):
+                    ilp_selected.append(remaining[i])
             
-            # Sort remaining candidates by coverage size (descending)
-            remaining = []
-            for key, edges, size in candidates:
-                if key not in selected_keys:
-                    remaining.append((key, edges, size))
-            
-            remaining.sort(key=lambda x: len(x[1]), reverse=True)
-            
-            # Add top remaining seeds
-            num_to_add = max_elites - len(ilp_selected)
-            for i in range(min(num_to_add, len(remaining))):
-                ilp_selected.append(remaining[i])
-        
         new_elites = {}
         for key, edges, size in ilp_selected:
             new_elites[key] = (list(edges), size)
