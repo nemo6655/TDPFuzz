@@ -503,7 +503,7 @@ def select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir):
         f.write(f"\n=== Generation {gen} (SS) ===\n")
         f.write("Pool 0000 (Elites):\n")
         for seed in sorted(elite_seeds_info, key=lambda x: x['name']):
-            f.write(f"{seed['name']} (Source: {seed['origin_gen']})\n")
+            f.write(f"{seed['name']} (Source: {seed['origin_gen']} Path:{seed['path']})\n")
             
         if seeds_to_rescue:
             f.write("\nPool 0001 (Missing Transitions):\n")

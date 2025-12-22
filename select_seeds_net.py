@@ -647,7 +647,18 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
         
         base_edges_set = base_edges if baseline is not None else set()
         ilp_selected = ilp_set_cover(candidates, base_edges_set)
-        
+        elmfuzz_rundir = os.environ.get('ELMFUZZ_RUNDIR')
+        if not elmfuzz_rundir:
+            print("Error: ELMFUZZ_RUNDIR environment variable not set.", file=sys.stderr)
+            sys.exit(1)
+        log_dir = os.path.join(elmfuzz_rundir, generation, 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        seeds_log_path = os.path.join(log_dir, 'seeds.log')
+        with open(seeds_log_path, 'a') as f:
+            f.write(f"ILP Selected Seeds: {len(ilp_selected)}\n")
+            for key, edges, size in ilp_selected:
+                f.write(f"{key}: {len(edges)} edges, size {size}\n")
+            
         # Hybrid Strategy: Fill up to max_elites
         if len(ilp_selected) < max_elites:
             print(f"ILP selected {len(ilp_selected)} seeds. Filling up to {max_elites}...", file=sys.stderr)
