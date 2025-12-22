@@ -49,7 +49,7 @@ fi
 CONTAINER_NAME="tdpfuzz_${TEST_OBJECT}_${IMAGE_NAME//:/_}_${TEST_NUMBER}"
 
 # 启动 Docker 容器并运行命令（detached 模式）
-DOCKER_CMD="docker run -d --cpus 8 --add-host=host.docker.internal:host-gateway -v /tmp/host:/tmp/host -v /var/run/docker.sock:/var/run/docker.sock --name \"$CONTAINER_NAME\" --entrypoint /bin/bash \"$IMAGE_NAME\" -c \"cd /home/appuser/elmfuzz && ELMFUZZ_RUNDIR=preset/${TEST_OBJECT} /home/appuser/miniconda3/envs/py310/bin/python /home/appuser/elmfuzz/cli/main.py tdnet -T ${FUZZER_NAME} ${TEST_OBJECT} -n 5\""
+DOCKER_CMD="docker run -d --add-host=host.docker.internal:host-gateway -v /tmp/host:/tmp/host -v /var/run/docker.sock:/var/run/docker.sock --name \"$CONTAINER_NAME\" --entrypoint /bin/bash \"$IMAGE_NAME\" -c \"cd /home/appuser/elmfuzz && ELMFUZZ_RUNDIR=preset/${TEST_OBJECT} /home/appuser/miniconda3/envs/py310/bin/python /home/appuser/elmfuzz/cli/main.py tdnet -T ${FUZZER_NAME} ${TEST_OBJECT} -n 5\""
 echo "Executing Docker command: $DOCKER_CMD"
 CONTAINER_ID=$(eval "$DOCKER_CMD")
 
@@ -82,7 +82,78 @@ if [ "$EXIT_CODE" -eq 0 ]; then
     fi
     
     # 清理临时目录
-    # rm -rf "$TMP_DIR"
+    rm -rf "$TMP_DIR"
+    
+    # 解压 tar.xz 文件到 DATA_PATH
+    tar -xf "$DATA_PATH/${FUZZER_NAME}_${TEST_OBJECT}_${TEST_NUMBER}.tar.xz" -C "$DATA_PATH"
+    
+    # 查找 gen5/aflnetout 目录
+    GEN5_AFLNETOUT_DIR=$(find "$DATA_PATH" -type d -path "*/gen5/aflnetout" | head -1)
+    
+    if [ -n "$GEN5_AFLNETOUT_DIR" ]; then
+        cd "$GEN5_AFLNETOUT_DIR"
+        mkdir -p gen5_all
+        for file in aflnetout_*.tar.gz; do
+            if [ -f "$file" ]; then
+                base=$(basename "$file" .tar.gz)
+                tar -xzf "$file" -C gen5_all --strip-components=1 "$base/replayable-queue"
+            fi
+        done
+        echo "Extraction completed in $GEN5_AFLNETOUT_DIR/gen5_all"
+    else
+        echo "gen5/aflnetout directory not found."
+    fi
+    TEST_OUTPUTS="$GEN5_AFLNETOUT_DIR/gen5_all"
+
+    # 生成目标覆盖率文件
+    case $TEST_OBJECT in
+        exim)
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash exim:latest -c \"cd /home/ubuntu/experiments/exim-gcov && cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim && cov_script /home/ubuntu/input/ 25 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            echo "Executing Docker command: $DOCKER_CMD"
+            CONTAINER_ID=$(eval "$DOCKER_CMD")
+            echo "Container ID: $CONTAINER_ID"
+            EXIT_CODE=$(docker wait "$CONTAINER_ID")
+            ;;
+        live555)
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash live555:profuzzbench -c \"cd /home/ubuntu/experiments/live555-cov/testProgs/ && cov_script /home/ubuntu/input/ 8554 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            echo "Executing Docker command: $DOCKER_CMD"
+            CONTAINER_ID=$(eval "$DOCKER_CMD")
+            echo "Container ID: $CONTAINER_ID"
+            EXIT_CODE=$(docker wait "$CONTAINER_ID")
+            ;;
+        forkeddaapd)
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash forked-daapd:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 3689 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            echo "Executing Docker command: $DOCKER_CMD"
+            CONTAINER_ID=$(eval "$DOCKER_CMD")
+            echo "Container ID: $CONTAINER_ID"
+            EXIT_CODE=$(docker wait "$CONTAINER_ID")
+            ;;
+        kamailio)
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash kamailio:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 5060 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            echo "Executing Docker command: $DOCKER_CMD"
+            CONTAINER_ID=$(eval "$DOCKER_CMD")
+            echo "Container ID: $CONTAINER_ID"
+            EXIT_CODE=$(docker wait "$CONTAINER_ID")
+            ;;
+        proftpd)
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash proftpd:latest -c \"cd /home/ubuntu/experiments/proftpd-gcov && cov_script /home/ubuntu/input/ 21 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            echo "Executing Docker command: $DOCKER_CMD"
+            CONTAINER_ID=$(eval "$DOCKER_CMD")
+            echo "Container ID: $CONTAINER_ID"
+            EXIT_CODE=$(docker wait "$CONTAINER_ID")
+            ;;
+        pureftpd)
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash pure-ftpd:latest -c \"cd /home/ubuntu/experiments/pure-ftpd-gcov && cov_script /home/ubuntu/input/ 21 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            echo "Executing Docker command: $DOCKER_CMD"
+            CONTAINER_ID=$(eval "$DOCKER_CMD")
+            echo "Container ID: $CONTAINER_ID"
+            EXIT_CODE=$(docker wait "$CONTAINER_ID")
+            ;;
+        *)
+            echo "Unknown test_object for coverage generation"
+            ;;
+    esac
+
 else
     echo "Docker container exited with error code: $EXIT_CODE"
     # 输出容器日志以获取错误原因
