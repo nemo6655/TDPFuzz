@@ -108,42 +108,42 @@ if [ "$EXIT_CODE" -eq 0 ]; then
     # 生成目标覆盖率文件
     case $TEST_OBJECT in
         exim)
-            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash exim:latest -c \"cd /home/ubuntu/experiments/exim-gcov && cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim && cov_script /home/ubuntu/input/ 25 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash exim:latest -c \"cd /home/ubuntu/experiments/exim-gcov && cp ./src/build-Linux-x86_64/exim /usr/exim/bin/exim && cov_script /home/ubuntu/input/ 25 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
             echo "Executing Docker command: $DOCKER_CMD"
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
             ;;
         live555)
-            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash live555:profuzzbench -c \"cd /home/ubuntu/experiments/live555-cov/testProgs/ && cov_script /home/ubuntu/input/ 8554 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash live555:profuzzbench -c \"cd /home/ubuntu/experiments/live555-cov/testProgs/ && cov_script /home/ubuntu/input/ 8554 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
             echo "Executing Docker command: $DOCKER_CMD"
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
             ;;
         forkeddaapd)
-            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash forked-daapd:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 3689 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash forked-daapd:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 3689 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
             echo "Executing Docker command: $DOCKER_CMD"
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
             ;;
         kamailio)
-            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash kamailio:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 5060 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash kamailio:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 5060 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
             echo "Executing Docker command: $DOCKER_CMD"
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
             ;;
         proftpd)
-            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash proftpd:latest -c \"cd /home/ubuntu/experiments/proftpd-gcov && cov_script /home/ubuntu/input/ 21 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash proftpd:latest -c \"cd /home/ubuntu/experiments/proftpd-gcov && cov_script /home/ubuntu/input/ 21 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
             echo "Executing Docker command: $DOCKER_CMD"
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
             ;;
         pureftpd)
-            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash pure-ftpd:latest -c \"cd /home/ubuntu/experiments/pure-ftpd-gcov && cov_script /home/ubuntu/input/ 21 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
+            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash pure-ftpd:latest -c \"cd /home/ubuntu/experiments/pure-ftpd-gcov && cov_script /home/ubuntu/input/ 21 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
             echo "Executing Docker command: $DOCKER_CMD"
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
