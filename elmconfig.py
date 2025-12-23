@@ -341,6 +341,8 @@ class ELMFuzzConfig:
                             help="Clean the output directories before running")
         group.add_argument("--run.state_pools", type=str, nargs='+', default=['0001', '0002'],
                            help="List of state pools")
+        group.add_argument("--run.rescue", type=bool, default=True,
+                           help="Rescue missing edges after ILP using greedy set cover")
 
         # XXX: For testing only
         # group = self.parser.add_argument_group('Test options', 'Lorem ipsum dolor sit amet')
