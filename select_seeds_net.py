@@ -7,6 +7,7 @@ from typing import Union, Literal, Optional
 import random
 from tqdm import tqdm
 import heapq
+import util
 
 MODEL = 'CodeLlama-13b-hf'
 
@@ -200,7 +201,7 @@ def extract_state_pseudo_edges(filename: str) -> set[str]:
 @click.option('--output-elite-file', '-o', 'output_elite_file', type=click.Path(writable=True, dir_okay=False), help='Elite seeds file')
 @click.option('--baseline', '-b', type=click.Path(exists=False), default=None)
 @click.option('--use-ilp', '-u', is_flag=True, help='Use ILP to find the minimum set of seeds covering all edges')
-@click.option('--rescue-missing', '-r', type=bool, default=True, help='Rescue missing edges after ILP using greedy set cover')
+@click.option('--rescue-missing', '-r', type=bool, default=None, help='Rescue missing edges after ILP using greedy set cover')
 def main(generation: str, current_covfile, max_elites: int, input_elite_file, output_elite_file, baseline, use_ilp, rescue_missing):
     if generation.startswith('gen'):
         try:
@@ -218,6 +219,17 @@ def main(generation: str, current_covfile, max_elites: int, input_elite_file, ou
         with open(click.format_filename(current_covfile), 'r') as f:
             coverage_raw = json.loads(f.read())
     ELMFUZZ_RUNDIR = os.environ.get('ELMFUZZ_RUNDIR')
+    
+    if rescue_missing is None:
+        try:
+            config_value = util.get_config('run.rescue')
+            if isinstance(config_value, str):
+                rescue_missing = config_value.lower() == 'true'
+            else:
+                rescue_missing = True  # 如果是list，默认True
+        except Exception as e:
+            print(f"Error getting rescue_missing from config: {e}", file=sys.stderr)
+            rescue_missing = True  # 默认值
     
     
     if baseline is not None:
