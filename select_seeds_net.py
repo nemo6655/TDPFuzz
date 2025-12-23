@@ -200,7 +200,7 @@ def extract_state_pseudo_edges(filename: str) -> set[str]:
 @click.option('--output-elite-file', '-o', 'output_elite_file', type=click.Path(writable=True, dir_okay=False), help='Elite seeds file')
 @click.option('--baseline', '-b', type=click.Path(exists=False), default=None)
 @click.option('--use-ilp', '-u', is_flag=True, help='Use ILP to find the minimum set of seeds covering all edges')
-@click.option('--rescue-missing', '-r', is_flag=True, help='Rescue missing edges after ILP using greedy set cover',default=True)
+@click.option('--rescue-missing', '-r', type=bool, default=True, help='Rescue missing edges after ILP using greedy set cover')
 def main(generation: str, current_covfile, max_elites: int, input_elite_file, output_elite_file, baseline, use_ilp, rescue_missing):
     if generation.startswith('gen'):
         try:
