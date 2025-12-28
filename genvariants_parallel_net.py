@@ -809,18 +809,582 @@ def main():
         for filename in args.files:
             worklist.append((i, filename))
             i += 1
-    # pbar = tqdm(total=len(worklist), desc='Generating', unit='variant')
-    with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = []
-        for i, filename in worklist:
-            future = executor.submit(generate_variant, i, generators, model, filename, args)
-            # future.add_done_callback(lambda _: pbar.update())
-            futures.append(future)
-        for future in as_completed(futures):
-            res = future.result()
-            if res is not None:
-                print(res, flush=True)
-    # pbar.close()
+    if model.startswith('glm-'):  # 智谱AI单独控制
+        # 使用二分法动态调整并发数
+        max_jobs = args.jobs  # 初始最大并发数
+        min_jobs = 1  # 最小并发数
+        current_jobs = max_jobs  # 当前并发数
+
+        # 检查是否有429错误（并发限制）
+        def has_rate_limit_error(futures):
+            for future in futures:
+                try:
+                    # 检查任务是否完成
+                    if future.done():
+                        try:
+                            res = future.result()
+                            # 检查结果中是否有429错误
+                            if isinstance(res, dict) and "error" in res:
+                                error_msg = res.get("error", "")
+                                # 检查多种可能的错误码
+                                if "1302" in error_msg or "1305" in error_msg or "429" in error_msg or "当前API请求过多" in error_msg:
+                                    return True
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            return False
+
+        # 尝试使用当前并发数执行任务
+        def try_with_jobs(jobs):
+            nonlocal worklist, generators, model, endpoint, args
+            global interrupted
+
+            print(f"尝试使用并发数: {jobs}", flush=True, file=sys.stderr)
+            with ThreadPoolExecutor(max_workers=jobs) as executor:
+                futures = []
+                for i, filename in worklist:
+                    future = executor.submit(generate_variant, i, generators, model, endpoint, filename, args)
+                    futures.append(future)
+
+                # 统计成功和失败的任务
+                success_count = 0
+                failure_count = 0
+                rate_limit_hit = False
+
+                # 等待部分任务完成以检查是否有429错误
+                completed_count = 0
+                check_threshold = min(jobs, len(futures))  # 检查至少等于并发数的任务
+
+                for future in as_completed(futures):
+                    # 检查是否收到中断信号
+                    if interrupted:
+                        print("收到中断信号，正在停止任务...", file=sys.stderr)
+                        executor.shutdown(wait=False)
+                        return True, success_count, failure_count
+
+                    try:
+                        res = future.result()
+                        if res is not None:
+                            print(res, flush=True)
+                            success_count += 1
+                        else:
+                            failure_count += 1
+                    except Exception as e:
+                        print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                        failure_count += 1
+
+                    completed_count += 1
+
+                    # 检查是否有429错误
+                    if has_rate_limit_error(futures):
+                        rate_limit_hit = True
+                        print(f"检测到API并发限制错误 (429)", file=sys.stderr)
+                        break
+
+                    # 如果已经检查了足够多的任务且没有429错误，继续执行
+                    if completed_count >= check_threshold and not rate_limit_hit:
+                        # 继续等待剩余任务完成
+                        continue
+
+                # 如果没有遇到429错误，等待所有任务完成
+                if not rate_limit_hit:
+                    for future in futures:
+                        # 检查是否收到中断信号
+                        if interrupted:
+                            print("收到中断信号，正在停止任务...", file=sys.stderr)
+                            executor.shutdown(wait=False)
+                            return True, success_count, failure_count
+
+                        if not future.done():
+                            try:
+                                res = future.result()
+                                if res is not None:
+                                    print(res, flush=True)
+                                    success_count += 1
+                                else:
+                                    failure_count += 1
+                            except Exception as e:
+                                print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                                failure_count += 1
+
+                # 打印统计信息
+                print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
+
+                return rate_limit_hit, success_count, failure_count
+
+        # 尝试加载之前保存的最佳并发数
+        saved_best_jobs = load_best_jobs(model)
+        if saved_best_jobs:
+            print(f"从配置文件加载到模型 {model} 的最佳并发数: {saved_best_jobs}", flush=True)
+            # 如果保存的最佳并发数小于请求的并发数，使用保存的值作为初始值
+            if saved_best_jobs < args.jobs:
+                best_jobs = saved_best_jobs
+            else:
+                best_jobs = 1
+        else:
+            best_jobs = 1  # 初始最佳并发数
+
+        best_efficiency = 0  # 初始最佳效率（成功数/时间）
+        best_success = 0  # 初始成功数
+
+        # 测试阶段：逐步增加并发数，找到效率最高的点
+        test_jobs = 1
+        test_results = {}  # 记录测试结果：{并发数: (成功率, 效率)}
+
+        # 首先测试几个基础点
+        # 对于GLM模型，限制最大并发数为5，避免触发API限制
+        if model.startswith('glm-'):
+            max_concurrent = min(5, args.jobs)
+            test_points = [1, 2, 3, 4, 5]
+        else:
+            max_concurrent = args.jobs
+            test_points = [1, 2, 4, 8]
+
+        # 如果有保存的最佳并发数，优先测试它
+        if saved_best_jobs and saved_best_jobs <= max_concurrent and saved_best_jobs not in test_points:
+            test_points.insert(0, saved_best_jobs)  # 插入到开头，优先测试
+
+        if max_concurrent < max(test_points):
+            test_points = [p for p in test_points if p <= max_concurrent]
+            if max_concurrent not in test_points:
+                test_points.append(max_concurrent)
+        else:
+            # 如果max_concurrent很大，添加一些中间点
+            if max_concurrent > 8:
+                test_points.extend([16, min(32, max_concurrent)])
+            test_points = sorted(list(set(test_points)))
+            test_points = [p for p in test_points if p <= max_concurrent]
+
+        # 测试各个点
+        for jobs in test_points:
+            # 检查是否收到中断信号
+            if interrupted:
+                print("收到中断信号，正在停止测试...", file=sys.stderr)
+                break
+
+            print(f"测试并发数: {jobs}", flush=True, file=sys.stderr)
+            start_time = time.time()
+            rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
+            elapsed_time = time.time() - start_time
+
+            # 计算效率（成功数/时间）
+            efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
+            test_results[jobs] = (success_count, efficiency)
+
+            print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True,
+                  file=sys.stderr)
+
+            # 更新最佳值
+            if efficiency > best_efficiency:
+                best_jobs = jobs
+                best_efficiency = efficiency
+                best_success = success_count
+
+            # 如果遇到429错误，停止测试更高的并发数
+            if rate_limit_hit:
+                print(f"并发数 {jobs} 遇到限制，停止测试更高的并发数", flush=True)
+                # 如果当前测试的并发数大于1，尝试更小的并发数
+                if jobs > 1:
+                    # 添加更小的测试点
+                    smaller_points = []
+                    for p in range(1, jobs):
+                        if p not in test_points:
+                            smaller_points.append(p)
+                    # 优先测试接近当前并发数的一半的值
+                    smaller_points.sort(key=lambda x: abs(x - jobs // 2))
+                    # 限制测试点数量
+                    if len(smaller_points) > 3:
+                        smaller_points = smaller_points[:3]
+                    # 添加到测试点列表
+                    test_points.extend(smaller_points)
+                    # 重新排序测试点
+                    test_points = sorted(list(set(test_points)))
+                    # 跳过当前测试点，继续测试更小的点
+                    continue
+                else:
+                    # 如果已经是1，无法再降低，直接退出
+                    break
+
+        # 如果测试点太少，或者最佳点在边界，进行精细化测试
+        if len(test_points) >= 2 and best_jobs not in [min(test_points), max(test_points)]:
+            # 在最佳点周围进行精细化测试
+            lower_bound = max(1, best_jobs // 2)
+            upper_bound = min(max_concurrent, best_jobs * 2)
+
+            # 生成测试点（包括最佳点周围的点）
+            fine_test_points = []
+            for i in range(lower_bound, upper_bound + 1):
+                if i not in test_points:
+                    fine_test_points.append(i)
+
+            # 按照与最佳点的距离排序，优先测试接近最佳点的值
+            fine_test_points.sort(key=lambda x: abs(x - best_jobs))
+
+            # 限制精细化测试的点数
+            if len(fine_test_points) > 5:
+                fine_test_points = fine_test_points[:5]
+
+            for jobs in fine_test_points:
+                # 检查是否收到中断信号
+                if interrupted:
+                    print("收到中断信号，正在停止精细化测试...", file=sys.stderr)
+                    break
+
+                print(f"精细化测试并发数: {jobs}", flush=True, file=sys.stderr)
+                start_time = time.time()
+                rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
+                elapsed_time = time.time() - start_time
+
+                # 计算效率
+                efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
+                test_results[jobs] = (success_count, efficiency)
+
+                print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s",
+                      flush=True, file=sys.stderr)
+
+                # 更新最佳值
+                if efficiency > best_efficiency:
+                    best_jobs = jobs
+                    best_efficiency = efficiency
+                    best_success = success_count
+
+                # 如果遇到429错误，停止测试更高的并发数
+                if rate_limit_hit:
+                    print(f"并发数 {jobs} 遇到限制，停止测试更高的并发数", flush=True)
+                    break
+
+        # 打印所有测试结果
+        print("\n所有测试结果:", flush=True)
+        for jobs, (success, efficiency) in sorted(test_results.items()):
+            print(f"并发数 {jobs}: 成功 {success}, 效率 {efficiency:.2f}/s", flush=True)
+
+        print(
+            f"\n最终使用并发数: {best_jobs}，效率 {best_efficiency:.2f}/s，效率 {best_efficiency:.2f}/s，成功生成 {best_success} 个变体",
+            flush=True)
+
+        # 保存找到的最佳并发数
+        save_best_jobs(model, best_jobs)
+
+        # 使用最佳并发数重新运行所有任务（如果之前的尝试被中断）
+        if best_jobs < args.jobs and not interrupted:
+            print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
+            try_with_jobs(best_jobs)
+    else:
+        # pbar = tqdm(total=len(worklist), desc='Generating', unit='variant')
+        with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+            futures = []
+            for i, filename in worklist:
+                future = executor.submit(generate_variant, i, generators, model, filename, args)
+                # future.add_done_callback(lambda _: pbar.update())
+                futures.append(future)
+            for future in as_completed(futures):
+                res = future.result()
+                if res is not None:
+                    print(res, flush=True)
+        # pbar.close()
+
+def save_best_jobs(model: str, best_jobs: int):
+    """保存找到的最佳并发数到文件中，以便下次使用"""
+    try:
+        # 创建配置目录（如果不存在）
+        config_dir = os.path.expanduser("~/.config/tdpfuzz")
+        os.makedirs(config_dir, exist_ok=True)
+
+        # 配置文件路径
+        config_file = os.path.join(config_dir, "best_jobs.json")
+
+        # 读取现有配置（如果存在）
+        config = {}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                config = {}
+
+        # 更新配置
+        config[model] = best_jobs
+
+        # 保存配置
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+
+        print(f"已保存模型 {model} 的最佳并发数 {best_jobs} 到配置文件", flush=True)
+    except Exception as e:
+        print(f"保存最佳并发数时出错: {str(e)}", file=sys.stderr)
+
+def validate_function_completeness(code: str) -> bool:
+    """验证生成的函数是否完整，特别是generate_json函数"""
+    try:
+        # 检查代码中是否包含generate_json函数定义
+        if "def generate_json" not in code:
+            return False
+
+        # 检查函数体是否包含基本逻辑
+        # 1. 检查是否有WrappedTextWriter的实例化
+        if "WrappedTextWriter(output)" not in code:
+            return False
+
+        # 2. 检查是否有WrappedTextReader的实例化
+        if "WrappedTextReader(rng)" not in code:
+            return False
+
+        # 3. 检查是否有基本的JSON输出逻辑
+        # 查找write_utf8调用，确保有输出
+        if "write_utf8" not in code:
+            return False
+
+        # 4. 检查函数是否有结束标记
+        # 确保函数有适当的结束
+        lines = code.split('')
+        in_function = False
+        indent_level = 0
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('def generate_json'):
+                in_function = True
+                indent_level = len(line) - len(line.lstrip())
+            elif in_function and stripped and not line.startswith(' ' * (indent_level + 1)) and not stripped.startswith('#'):
+                # 函数已经结束
+                break
+
+        # 如果没有找到函数结束，认为不完整
+        return True
+    except Exception as e:
+        print(f"验证函数完整性时发生错误: {e}", file=sys.stderr)
+        return False
+
+def complete_incomplete_function(code: str) -> Optional[str]:
+    """尝试补全不完整的generate_json函数"""
+    try:
+        # 检查函数是否定义了但没有实现
+        if "def generate_json" in code and "return" not in code:
+            lines = code.split('')
+
+            # 找到函数定义行
+            func_start = -1
+            for i, line in enumerate(lines):
+                if "def generate_json" in line:
+                    func_start = i
+                    break
+
+            if func_start >= 0:
+                # 检查函数体是否为空或只有注释
+                func_lines = lines[func_start+1:]
+                has_code = False
+                for line in func_lines:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith('#'):
+                        has_code = True
+                        break
+
+                if not has_code:
+                    # 添加基本的JSON生成逻辑
+                    basic_impl = [
+                        "    # 基本的JSON生成逻辑",
+                        "    wrapped_output = WrappedTextWriter(output)",
+                        "    wrapped_rng = WrappedTextReader(rng)",
+                        "    ",
+                        "    # 生成一个简单的JSON对象",
+                        "    wrapped_output.write_utf8('{\n')",
+                        "    ",
+                        "    # 随机决定生成对象或数组",
+                        "    choice = int(wrapped_rng.read(1)[0]) % 2",
+                        "    if choice == 0:",
+                        "        # 生成对象",
+                        "        wrapped_output.write_utf8('\"key\": \"value\"\n')",
+                        "    else:",
+                        "        # 生成数组",
+                        "        wrapped_output.write_utf8('\"array\": [1, 2, 3]\n')",
+                        "    ",
+                        "    wrapped_output.write_utf8('}\n')"
+                    ]
+
+                    # 替换空函数体
+                    new_lines = lines[:func_start+1] + basic_impl
+                    return ''.join(new_lines)
+
+        return None
+    except Exception as e:
+        print(f"补全函数时发生错误: {e}", file=sys.stderr)
+        return None
+
+def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
+    """尝试修复常见的Python语法错误，如果无法修复则使用GLM模型进行智能纠错"""
+    try:
+        # 首先尝试简单的规则修复
+        simple_fix = simple_syntax_fix(code, error)
+        if simple_fix:
+            return simple_fix
+
+        # 如果简单修复失败，尝试使用GLM模型进行智能纠错
+        return ai_syntax_fix(code, error)
+    except Exception as e:
+        print(f"修复语法错误时发生异常: {e}", file=sys.stderr)
+        return None
+
+def simple_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
+    """使用规则修复简单的语法错误"""
+    try:
+        # 获取错误位置
+        error_line = error.lineno
+        error_offset = error.offset
+
+        lines = code.split('\n')
+        if error_line <= len(lines):
+            error_line_content = lines[error_line - 1]
+
+            # 修复常见的语法错误
+            # 1. 修复多余的右括号
+            if "unexpected EOF while parsing" in str(error) and "')" in error_line_content:
+                # 检查是否有多余的右括号
+                open_parens = error_line_content.count('(')
+                close_parens = error_line_content.count(')')
+                if close_parens > open_parens:
+                    # 移除多余的右括号
+                    fixed_line = error_line_content[:error_offset-1] + error_line_content[error_offset:]
+                    lines[error_line - 1] = fixed_line.replace('))', ')')
+                    return '\n'.join(lines)
+
+            # 2. 修复缩进错误
+            if "unexpected indent" in str(error) or "unindent does not match" in str(error):
+                # 尝试修复缩进
+                fixed_lines = []
+                for i, line in enumerate(lines):
+                    if i == error_line - 1:
+                        # 修复当前行的缩进
+                        stripped = line.lstrip()
+                        if stripped:
+                            # 使用4空格缩进
+                            fixed_lines.append('    ' + stripped)
+                        else:
+                            fixed_lines.append('')
+                    else:
+                        fixed_lines.append(line)
+                return '\n'.join(fixed_lines)
+
+            # 3. 修复未闭合的字符串
+            if "EOL while scanning string literal" in str(error):
+                # 尝试闭合字符串
+                if error_line <= len(lines):
+                    line = lines[error_line - 1]
+                    if "'" in line and not line.count("'") % 2 == 0:
+                        lines[error_line - 1] = line + "'"
+                    elif '"' in line and not line.count('"') % 2 == 0:
+                        lines[error_line - 1] = line + '"'
+                    return '\n'.join(lines)
+
+            # 4. 修复缺失的冒号
+            if "expected ':'" in str(error):
+                if error_line <= len(lines):
+                    line = lines[error_line - 1]
+                    # 在行末添加冒号（如果没有）
+                    if not line.rstrip().endswith(':'):
+                        lines[error_line - 1] = line.rstrip() + ':'
+                        return '\n'.join(lines)
+
+        # 如果无法自动修复，返回None
+        return None
+    except Exception as e:
+        print(f"简单语法修复时发生异常: {e}", file=sys.stderr)
+        return None
+
+def ai_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
+    """使用GLM模型进行智能语法纠错"""
+    try:
+        # 获取端点信息
+        endpoints = get_endpoints()
+        if not endpoints:
+            print("无法获取API端点信息，跳过AI语法修复", file=sys.stderr)
+            return None
+
+        # 使用可用的GLM模型，优先使用性能更好的模型
+        model_name = None
+        endpoint = None
+        for model in ['glm-4.6', 'glm-4.5-flash', 'glm-4-flash', 'glm-4', 'glm-3-turbo']:
+            if model in endpoints:
+                model_name = model
+                endpoint = endpoints[model]
+                break
+
+        if not model_name or not endpoint:
+            print("没有可用的GLM模型，跳过AI语法修复", file=sys.stderr)
+            return None
+
+        # 构建纠错提示，使用更明确的指令
+        error_msg = str(error)
+        prompt = f"""请修复以下Python代码中的语法错误。
+
+错误信息: {error_msg}
+
+```python
+{code}
+```
+
+要求:
+1. 只返回修复后的完整代码，不要包含任何解释或其他文本
+2. 确保修复后的代码是有效的Python代码，没有语法错误
+3. 保持代码的原始功能和逻辑不变，只修复语法问题
+4. 不要添加markdown代码块标记（如```python和```）"""
+
+        # 调用GLM API进行语法纠错，使用优化后的参数
+        response = generate_completion_glm(
+            prompt=prompt,
+            endpoint=endpoint,
+            model_name=model_name,
+            temperature=0.1,  # 使用较低的温度，确保更稳定的输出
+            max_new_tokens=2048
+        )
+
+        if 'generated_text' in response:
+            fixed_code = response['generated_text'].strip()
+
+            # 尝试提取代码块中的代码（以防模型添加了markdown标记）
+            if '```python' in fixed_code and '```' in fixed_code:
+                try:
+                    start = fixed_code.index('```python') + 9
+                    end = fixed_code.rindex('```')
+                    fixed_code = fixed_code[start:end].strip()
+                except Exception:
+                    pass
+
+            # 验证修复后的代码语法是否正确
+            try:
+                compile(fixed_code, '<string>', 'exec')
+                print("使用GLM模型成功修复语法错误", file=sys.stderr)
+                return fixed_code
+            except SyntaxError as e:
+                print(f"GLM模型修复后的代码仍有语法错误: {e}", file=sys.stderr)
+                # 如果仍然有语法错误，尝试再次修复
+                return None
+        else:
+            print(f"GLM API返回错误: {response}", file=sys.stderr)
+            return None
+
+    except Exception as e:
+        print(f"AI语法修复时发生异常: {e}", file=sys.stderr)
+        return None
+
+def load_best_jobs(model: str) -> Optional[int]:
+    """从配置文件中加载模型的最佳并发数"""
+    try:
+        # 配置文件路径
+        config_file = os.path.expanduser("~/.config/tdpfuzz/best_jobs.json")
+
+        # 检查文件是否存在
+        if not os.path.exists(config_file):
+            return None
+
+        # 读取配置
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+
+        # 返回模型的最佳并发数（如果存在）
+        return config.get(model)
+    except Exception as e:
+        print(f"加载最佳并发数时出错: {str(e)}", file=sys.stderr)
+        return None
 
 def on_nsf_access() -> dict[str, str] | None:
     if not 'ACCESS_INFO' in os.environ:
