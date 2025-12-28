@@ -272,16 +272,32 @@ def generate_completion_glm(
                     result = response.json()
                     # 转换为与TGI兼容的格式
                     if "choices" in result and len(result["choices"]) > 0:
+                        # 记录调用成功状态和tokens消耗
+                        usage_info = result.get("usage", {})
+                        prompt_tokens = usage_info.get("prompt_tokens", 0)
+                        completion_tokens = usage_info.get("completion_tokens", 0)
+                        total_tokens = usage_info.get("total_tokens", 0)
+
+                        print(f"智谱AI调用成功 - 模型: {model_name}, "
+                              f"提示词tokens: {prompt_tokens}, "
+                              f"生成tokens: {completion_tokens}, "
+                              f"总tokens: {total_tokens}, "
+                              f"完成原因: {result['choices'][0].get('finish_reason', 'unknown')}", 
+                              flush=True, file=sys.stderr)
+
                         return {
                             "generated_text": result["choices"][0]["message"]["content"],
                             "details": {
-                                "finish_reason": result["choices"][0].get("finish_reason", "unknown")
+                                "finish_reason": result["choices"][0].get("finish_reason", "unknown"),
+                                "prompt_tokens": prompt_tokens,
+                                "completion_tokens": completion_tokens,
+                                "total_tokens": total_tokens
                             }
                         }
                 elif response.status_code == 429:
                     # 遇到429错误，使用指数退避策略
                     delay = min(30, base_delay * (2 ** attempt))  # 指数增长，最多30秒
-                    print(f"API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
+                    print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 错误: API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
 
                     # 在等待期间检查中断信号
                     for i in range(int(delay)):
@@ -300,7 +316,7 @@ def generate_completion_glm(
                             "error": f"GLM API rate limit error after {max_retries} attempts: {response.status_code} - {response.text}"
                         }
                 else:
-                    print(f"API返回错误状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
+                    print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
                     if attempt < max_retries - 1:
                         print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
                         continue
@@ -312,7 +328,7 @@ def generate_completion_glm(
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as e:
                 if attempt < max_retries - 1:  # 如果不是最后一次尝试
                     delay = min(30, base_delay * (2 ** attempt))  # 指数退避
-                    print(f"请求异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                    print(f"智谱AI调用失败 - 模型: {model_name}, 异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
 
                     # 在等待期间检查中断信号
                     for i in range(int(delay)):
@@ -334,7 +350,7 @@ def generate_completion_glm(
 
         # 检查是否是429错误（并发限制）
         if response and response.status_code == 429:
-            print(f"API并发限制错误 (429): {response.text}", file=sys.stderr)
+            print(f"智谱AI调用最终失败 - 模型: {model_name}, API并发限制错误 (429): {response.text}", file=sys.stderr)
 
         return {
             "error": error_msg
