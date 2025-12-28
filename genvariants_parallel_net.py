@@ -844,7 +844,7 @@ def main():
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 futures = []
                 for i, filename in worklist:
-                    future = executor.submit(generate_variant, i, generators, model, endpoint, filename, args)
+                    future = executor.submit(generate_variant, i, generators, model, filename, args)
                     futures.append(future)
 
                 # 统计成功和失败的任务
