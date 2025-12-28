@@ -201,6 +201,14 @@ def generate_completion_glm(
         response = None
 
         for attempt in range(max_retries):
+            # 检查是否收到中断信号
+            global interrupted
+            if interrupted:
+                print("收到中断信号，停止API请求...", file=sys.stderr)
+                return {
+                    "error": "Interrupted by user"
+                }
+
             try:
                 # 发送请求
                 response = requests.post(
@@ -226,7 +234,15 @@ def generate_completion_glm(
                     # 遇到429错误，使用指数退避策略
                     delay = min(30, base_delay * (2 ** attempt))  # 指数增长，最多30秒
                     print(f"API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
-                    time.sleep(delay)
+
+                    # 在等待期间检查中断信号
+                    for i in range(int(delay)):
+                        if interrupted:
+                            print("收到中断信号，停止等待重试...", file=sys.stderr)
+                            return {
+                                "error": "Interrupted by user"
+                            }
+                        time.sleep(1)
                     if attempt < max_retries - 1:
                         print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
                         continue
@@ -249,7 +265,15 @@ def generate_completion_glm(
                 if attempt < max_retries - 1:  # 如果不是最后一次尝试
                     delay = min(30, base_delay * (2 ** attempt))  # 指数退避
                     print(f"请求异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
-                    time.sleep(delay)
+
+                    # 在等待期间检查中断信号
+                    for i in range(int(delay)):
+                        if interrupted:
+                            print("收到中断信号，停止等待重试...", file=sys.stderr)
+                            return {
+                                "error": "Interrupted by user"
+                            }
+                        time.sleep(1)
                     continue
                 else:
                     # 最后一次尝试失败，返回错误信息
@@ -844,6 +868,10 @@ def main():
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 futures = []
                 for i, filename in worklist:
+                    # 检查是否收到中断信号
+                    if interrupted:
+                        print("收到中断信号，正在停止任务提交...", file=sys.stderr)
+                        break
                     future = executor.submit(generate_variant, i, generators, model, filename, args)
                     futures.append(future)
 
