@@ -581,6 +581,8 @@ def generate_variant(i, generators, model, filename, args):
     res = generate_completion(
         prompt,
         stop=stop,
+        endpoint=args.endpoint,
+        model_name=args.model_name,
         **vars(args.gen),
     )
     if 'generated_text' not in res:
