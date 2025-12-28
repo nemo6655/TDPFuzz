@@ -884,25 +884,51 @@ def main():
                 completed_count = 0
                 check_threshold = min(jobs, len(futures))  # 检查至少等于并发数的任务
 
-                for future in as_completed(futures):
+                # 使用超时机制，定期检查中断信号
+                while futures:
                     # 检查是否收到中断信号
                     if interrupted:
                         print("收到中断信号，正在停止任务...", file=sys.stderr)
                         executor.shutdown(wait=False)
                         return True, success_count, failure_count
 
+                    # 使用短超时等待任务完成
+                    done_futures = []
                     try:
-                        res = future.result()
-                        if res is not None:
-                            print(res, flush=True)
-                            success_count += 1
-                        else:
-                            failure_count += 1
-                    except Exception as e:
-                        print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
-                        failure_count += 1
+                        # 等待最多0.1秒，以便定期检查中断信号
+                        for future in as_completed(futures, timeout=0.1):
+                            done_futures.append(future)
+                            break  # 只处理一个任务，然后重新检查中断信号
+                    except:
+                        # 超时是正常的，继续循环检查中断信号
+                        pass
 
-                    completed_count += 1
+                    # 处理已完成的任务
+                    for future in done_futures:
+                        futures.remove(future)
+                        try:
+                            res = future.result()
+                            if res is not None:
+                                print(res, flush=True)
+                                success_count += 1
+                            else:
+                                failure_count += 1
+                        except Exception as e:
+                            print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                            failure_count += 1
+
+                        completed_count += 1
+
+                        # 检查是否有429错误
+                        if has_rate_limit_error(futures):
+                            rate_limit_hit = True
+                            print(f"检测到API并发限制错误 (429)", file=sys.stderr)
+                            break
+
+                        # 如果已经检查了足够多的任务且没有429错误，继续执行
+                        if completed_count >= check_threshold and not rate_limit_hit:
+                            # 继续等待剩余任务完成
+                            continue
 
                     # 检查是否有429错误
                     if has_rate_limit_error(futures):
@@ -926,6 +952,15 @@ def main():
 
                         if not future.done():
                             try:
+                                # 使用超时机制，每秒检查一次中断信号
+                                while not future.done():
+                                    if interrupted:
+                                        print("收到中断信号，正在停止任务...", file=sys.stderr)
+                                        executor.shutdown(wait=False)
+                                        return True, success_count, failure_count
+                                    time.sleep(0.1)  # 短暂休眠，避免CPU占用过高
+
+                                # 任务已完成，获取结果
                                 res = future.result()
                                 if res is not None:
                                     print(res, flush=True)
