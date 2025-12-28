@@ -829,6 +829,6 @@ def on_nsf_access() -> dict[str, str] | None:
     }
 
 if __name__ == '__main__':
-    access_info = on_nsf_access()
-    ENDPOINT = get_endpoints()['codellama/CodeLlama-13b-hf'] if access_info is None else access_info['endpoint']
+    # access_info = on_nsf_access()
+    # ENDPOINT = get_endpoints()['codellama/CodeLlama-13b-hf'] if access_info is None else access_info['endpoint']
     main()
