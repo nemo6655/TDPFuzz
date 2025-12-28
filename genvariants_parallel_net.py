@@ -197,7 +197,7 @@ def generate_completion_glm(
         # 优化重试机制，使用指数退避策略
         max_retries = 3
         base_delay = 1  # 基础延迟时间（秒）
-        timeout = 60    # 超时时间
+        timeout = 60 * 30    # 超时时间
         response = None
 
         for attempt in range(max_retries):
@@ -210,13 +210,61 @@ def generate_completion_glm(
                 }
 
             try:
-                # 发送请求
-                response = requests.post(
-                    endpoint,
-                    headers=headers,
-                    json=data,
-                    timeout=timeout
-                )
+                # 使用自适应超时机制，初始使用60秒超时
+                # 初始超时时间设为60秒，给API足够的处理时间
+                initial_short_timeout = min(60, timeout)  # 初始60秒超时，但不超过总超时时间
+
+                # 计算最大尝试次数，确保有足够的中断检查点
+                # 由于初始超时时间较长，设置较少的尝试次数
+                min_attempts = 1  # 至少尝试1次
+                max_attempts = max(min_attempts, 2)  # 最多尝试2次
+
+                response = None
+                cumulative_time = 0  # 累计已用时间
+
+                for req_attempt in range(max_attempts):
+                    # 检查是否收到中断信号
+                    if interrupted:
+                        print("收到中断信号，停止API请求...", file=sys.stderr)
+                        return {
+                            "error": "Interrupted by user"
+                        }
+
+                    # 直接使用初始超时时间（60秒），不再逐渐增加
+                    short_timeout = initial_short_timeout
+
+                    # 确保不超过剩余的总超时时间
+                    remaining_time = timeout - cumulative_time
+                    short_timeout = min(short_timeout, remaining_time)
+
+                    # 如果剩余时间不足，直接抛出超时异常
+                    if cumulative_time >= timeout:
+                        raise requests.exceptions.ReadTimeout(f"Request timed out after {timeout} seconds")
+
+                    try:
+                        # 发送请求，使用当前计算的超时时间
+                        start_time = time.time()
+                        response = requests.post(
+                            endpoint,
+                            headers=headers,
+                            json=data,
+                            timeout=short_timeout
+                        )
+                        break  # 请求成功，跳出循环
+                    except requests.exceptions.Timeout:
+                        # 记录已用时间
+                        request_time = time.time() - start_time
+                        cumulative_time += request_time
+
+                        # 打印超时信息，帮助用户了解请求状态
+                        print(f"请求超时 ({short_timeout}s)，累计等待时间: {cumulative_time:.1f}s/{timeout}s，正在重试...", file=sys.stderr)
+
+                        # 如果不是最后一次尝试，继续
+                        if req_attempt < max_attempts - 1 and cumulative_time < timeout:
+                            continue
+                        else:
+                            # 最后一次尝试或已超过总超时时间，抛出超时异常
+                            raise requests.exceptions.ReadTimeout(f"Request timed out after {timeout} seconds")
 
                 # 检查响应状态码
                 if response.status_code == 200:
