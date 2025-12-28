@@ -4,28 +4,141 @@ import json
 import random
 import os
 import sys
+import time
+import signal
+import sys
 from typing import List, Optional, Dict
 from argparse import ArgumentParser
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import autopep8
 import textwrap
+import re
+
+
+# 全局变量，用于跟踪中断状态
+interrupted = False
+
+# 全局变量用于缓存API密钥，避免重复读取
+_cached_glm_api_key = None
+
+def signal_handler(sig, frame):
+    """处理Ctrl+C中断信号"""
+    global interrupted
+    print("\n\n收到中断信号，正在停止程序...", file=sys.stderr)
+    interrupted = True
+
+
+def get_glm_api_key():
+    """获取GLM API密钥，使用全局缓存避免重复读取"""
+    global _cached_glm_api_key
+
+    # 如果已经缓存，直接返回
+    if _cached_glm_api_key:
+        return _cached_glm_api_key
+
+    # 首先尝试从环境变量获取
+    glm_api_key = os.getenv('GLM_API_KEY')
+
+    # 如果环境变量不存在，尝试从配置文件读取
+    if not glm_api_key:
+        token_paths = [
+            "/home/appuser/.config/glm/token",  # 容器内appuser配置
+            os.path.expanduser("~/.config/glm/token"),  # 用户级配置
+        ]
+
+        for token_path in token_paths:
+            if os.path.exists(token_path):
+                with open(token_path, "r") as f:
+                    glm_api_key = f.read().strip()
+                break
+
+    if not glm_api_key:
+        raise ValueError("GLM API Key not found in environment variables or config files")
+
+    # 缓存API密钥
+    _cached_glm_api_key = glm_api_key
+    return glm_api_key
 
 def get_endpoints() -> Dict[str, str]:
     result = dict()
-    endpoint_list = os.getenv('ENDPOINTS').split(' ') # type: ignore
-    for endpoint_pair in endpoint_list:
-        (model, endpoint) = endpoint_pair.split(':', 1)
-        result[model] = endpoint
+    # Try to get endpoints from environment variable first
+    endpoints_env = os.getenv('ENDPOINTS')
+    if endpoints_env:
+        endpoint_list = endpoints_env.split(' ')  # type: ignore
+        for endpoint_pair in endpoint_list:
+            (model, endpoint) = endpoint_pair.split(':', 1)
+            result[model] = endpoint
+        return result
+
+    # 如果没有环境变量，添加默认的智谱API端点
+    result['glm-4.6'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 最新模型
+    result['glm-4.5-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 快速模型
+    result['glm-4-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4-air'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4-airx'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-4-long'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    result['glm-3-turbo'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+
+    # If not in environment, try to get from config file
+    try:
+        import sys
+        sys.path.insert(0, '.')
+        from elmconfig import ELMFuzzConfig
+        import argparse
+
+        # Create a config parser
+        config = ELMFuzzConfig(prog='genvariants_parallel')
+
+        # Parse args to get config file
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--config', type=str, default=None)
+        args, _ = parser.parse_known_args()
+
+        if args.config:
+            # Load the config file
+            conf = config.yaml.load(open(args.config).read())
+            if 'model' in conf and 'endpoints' in conf['model']:
+                for endpoint_pair in conf['model']['endpoints']:
+                    if ':' in endpoint_pair:
+                        (model, endpoint) = endpoint_pair.split(':', 1)
+                        result[model] = endpoint
+    except Exception as e:
+        print(f"Warning: Could not load endpoints from config file: {e}", file=sys.stderr)
+
     return result
 
 
-def model_info():
+def model_info(model_name: str, endpoint: str):
     """Get information about the model."""
-    return requests.get(f'{ENDPOINT}/info').json()
+    # 检查是否是GLM模型
+    if model_name and model_name.startswith('glm'):
+        # GLM模型没有/info端点，返回模型名称
+        return {'model_id': model_name}
+    else:
+        # 其他模型使用标准的/info端点
+        return requests.get(f'{endpoint}/info').json()
 
 def generate_completion(
         prompt,
+        endpoint,
+        model_name,
+        temperature=0.2,
+        max_new_tokens=1200,
+        repetition_penalty=1.1,
+        stop=None
+):
+    """Generate a completion of the prompt."""
+    if model_name and model_name.startswith('glm'):
+        return generate_completion_glm(prompt, endpoint, model_name, temperature, max_new_tokens, repetition_penalty, stop)
+    else:
+        return generate_completion_tgi(prompt, endpoint, temperature, max_new_tokens, repetition_penalty, stop)
+
+
+def generate_completion_tgi(
+        prompt,
+        endpoint,
         temperature=0.2,
         max_new_tokens=1200,
         repetition_penalty=1.1,
@@ -44,19 +157,120 @@ def generate_completion(
     }
     if stop is not None:
         data['parameters']['stop'] = stop
+    # 增加超时时间
+    response = requests.post(f'{endpoint}/generate', json=data, timeout=60)
+    return response.json()
+
+def generate_completion_glm(
+        prompt,
+        endpoint,
+        model_name,
+        temperature=0.2,
+        max_new_tokens=1200,
+        repetition_penalty=1.1,
+        stop=None
+):
+    """Generate a completion of the prompt using GLM API."""
     try:
-        response = requests.post(f'{ENDPOINT}/generate', json=data)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_res = {"error": f"Request failed: {e}"}
-        if e.response is not None:
-            error_res["response_text"] = e.response.text
-        return error_res
-    except requests.exceptions.JSONDecodeError as e:
+        # 获取API密钥
+        glm_api_key = get_glm_api_key()
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {glm_api_key}"
+        }
+
+        # 优化数据结构，减少不必要的字段
+        data = {
+            "model": model_name,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_new_tokens,
+        }
+
+        # 只有在必要时才添加stop参数
+        if stop is not None:
+            data["stop"] = stop
+
+        # 优化重试机制，使用指数退避策略
+        max_retries = 3
+        base_delay = 1  # 基础延迟时间（秒）
+        timeout = 60    # 超时时间
+        response = None
+
+        for attempt in range(max_retries):
+            try:
+                # 发送请求
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json=data,
+                    timeout=timeout
+                )
+
+                # 检查响应状态码
+                if response.status_code == 200:
+                    # 解析响应
+                    result = response.json()
+                    # 转换为与TGI兼容的格式
+                    if "choices" in result and len(result["choices"]) > 0:
+                        return {
+                            "generated_text": result["choices"][0]["message"]["content"],
+                            "details": {
+                                "finish_reason": result["choices"][0].get("finish_reason", "unknown")
+                            }
+                        }
+                elif response.status_code == 429:
+                    # 遇到429错误，使用指数退避策略
+                    delay = min(30, base_delay * (2 ** attempt))  # 指数增长，最多30秒
+                    print(f"API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
+                    time.sleep(delay)
+                    if attempt < max_retries - 1:
+                        print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                        continue
+                    else:
+                        # 最后一次尝试失败，返回错误信息
+                        return {
+                            "error": f"GLM API rate limit error after {max_retries} attempts: {response.status_code} - {response.text}"
+                        }
+                else:
+                    print(f"API返回错误状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
+                    if attempt < max_retries - 1:
+                        print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                        continue
+                    else:
+                        # 最后一次尝试失败，返回错误信息
+                        return {
+                            "error": f"GLM API error after {max_retries} attempts: {response.status_code} - {response.text}"
+                        }
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as e:
+                if attempt < max_retries - 1:  # 如果不是最后一次尝试
+                    delay = min(30, base_delay * (2 ** attempt))  # 指数退避
+                    print(f"请求异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                    time.sleep(delay)
+                    continue
+                else:
+                    # 最后一次尝试失败，返回错误信息
+                    return {
+                        "error": f"GLM API request failed after {max_retries} attempts: {str(e)}"
+                    }
+
+        # 如果所有重试都失败，返回错误信息
+        error_msg = f"GLM API error: {response.status_code} - {response.text}"
+
+        # 检查是否是429错误（并发限制）
+        if response and response.status_code == 429:
+            print(f"API并发限制错误 (429): {response.text}", file=sys.stderr)
+
         return {
-            "error": f"JSON decode error: {e}",
-            "response_text": response.text
+            "error": error_msg
+        }
+    except Exception as e:
+        # 捕获所有其他异常
+        return {
+            "error": f"GLM API call failed: {str(e)}"
         }
 
 def infilling_prompt_llama(
@@ -88,7 +302,16 @@ def infilling_prompt_starcoder(
     """
     return f'<fim_prefix>{pre}<fim_suffix>{suf}<fim_middle>'
 
-import re
+def infilling_prompt_glm(
+    pre: str,
+    suf: str,
+) -> str:
+    """
+    Format an infilling problem for GLM.
+    """
+    return f'<|fim_prefix|>{pre}<|fim_suffix|>{suf}<|fim_middle|>'
+
+
 
 def get_mutable_limit(text: str) -> int:
     """
@@ -483,21 +706,63 @@ def init_parser(elm):
     # Add a bit of help text to the generation options
     elm.subgroup_help['gen'] = 'Generation parameters'
 
+def set_endpoint(model_name, access_info):
+    if access_info is None:
+        endpoints = get_endpoints()
+
+        # 检查用户指定的模型是否在可用端点中
+        user_model = model_name
+        if endpoints and endpoints.get(user_model):
+            # 使用用户指定的模型
+            endpoint = endpoints[user_model]
+        # 如果用户指定的模型不在端点中，尝试使用CodeLlama模型
+        elif endpoints and endpoints.get('codellama/CodeLlama-13b-hf'):
+            endpoint = endpoints['codellama/CodeLlama-13b-hf']
+        # 如果没有CodeLlama，尝试使用最新的智谱模型glm-4.5-flash
+        elif endpoints and endpoints.get('glm-4.5-flash'):
+            endpoint = endpoints['glm-4.5-flash']
+            # 更新模型名称为智谱模型
+            model_name = 'glm-4.5-flash'
+        # 如果没有glm-4.5-flash，尝试使用glm-4-flash
+        elif endpoints and endpoints.get('glm-4-flash'):
+            endpoint = endpoints['glm-4-flash']
+            # 更新模型名称为智谱模型
+            model_name = 'glm-4-flash'
+        # 如果以上都没有，尝试使用其他智谱模型
+        elif endpoints and any(key.startswith('glm-') for key in endpoints):
+            glm_models = [k for k in endpoints.keys() if k.startswith('glm-')]
+            endpoint = endpoints[glm_models[0]]
+            # 更新模型名称为智谱模型
+            model_name = glm_models[0]
+        else:
+            # 如果都没有，抛出错误
+            raise ValueError("No available model endpoints found. Please configure CodeLlama or GLM model endpoints.")
+    else:
+        endpoint = access_info['endpoint']
+    return model_name, endpoint
+
 def main():
     global ENDPOINT
     global infilling_prompt
+    global interrupted
     from elmconfig import ELMFuzzConfig
+
+    # 注册信号处理器，用于处理Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+
     config = ELMFuzzConfig(prog='genvariants_parallel', parents={'genvariants_parallel': make_parser()})
     init_parser(config)
     args = config.parse_args()
 
     try:
         access_info = on_nsf_access()
-        ENDPOINT = args.model.endpoints[args.model_name] if access_info is None else access_info['endpoint']
+        new_model_name, endpoint = set_endpoint(args.model_name, access_info)
+        ENDPOINT = endpoint
+        args.model_name = new_model_name
     except KeyError:
         print(f'WARNING: no endpoint for model {args.model_name}, using default: {ENDPOINT}', file=sys.stderr)
 
-    info = model_info()
+    info = model_info(args.model_name, ENDPOINT)
     model = info['model_id']
     if model != args.model_name:
         print(f'WARNING: Expected model {args.model_name}, but {ENDPOINT} is actually {model}', file=sys.stderr)
@@ -509,6 +774,8 @@ def main():
         infilling_prompt = infilling_prompt_llama
     elif model.startswith('Qwen/Qwen2.5-Coder'):
         infilling_prompt = infilling_prompt_qwen
+    elif model.startswith('glm-'):
+        infilling_prompt = infilling_prompt_glm
 
     if infilling_prompt is None and not args.no_fim:
         config.parser.error(f'Model {model} does not support FIM')
