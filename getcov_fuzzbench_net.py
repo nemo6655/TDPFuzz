@@ -52,14 +52,15 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
     # afl_timeout = int(get_config('cli.getcov.afl_timeout'))
     
     cwd = os.path.dirname(os.path.abspath(__file__))
-    # if access_info is not None:
-    #     prefix = os.path.join(cwd, 'tmp', 'fuzzdata') + '/'
-    # elif bool(os.environ.get('REPROUDCE_MODE', 'false')):
-    prefix = '/tmp/host/fuzzdata/'
-    # else:
-    #     prefix = '/tmp/fuzzdata/'
-    # if not os.path.exists(prefix):
-    #     os.makedirs(prefix)
+    #
+    if access_info is not None:
+        prefix = os.path.join(cwd, 'tmp', 'fuzzdata') + '/'
+    elif bool(os.environ.get('REPROUDCE_MODE', 'false')):
+        prefix = '/tmp/host/fuzzdata/'
+    else:
+        prefix = '/tmp/fuzzdata/'
+    if not os.path.exists(prefix):
+        os.makedirs(prefix)
     dest_dir = output if output else os.path.join(tmpdir, 'out')
     os.makedirs(dest_dir, exist_ok=True)
     aflout_path = os.path.join(dest_dir, 'aflnetout.tar.gz')
