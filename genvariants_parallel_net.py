@@ -196,7 +196,7 @@ def generate_completion_glm(
 
         # 优化重试机制，使用指数退避策略
         max_retries = 3
-        base_delay = 1  # 基础延迟时间（秒）
+        base_delay = 2  # 基础延迟时间（秒）
         timeout = 60 * 30    # 超时时间
         response = None
 
@@ -242,6 +242,9 @@ def generate_completion_glm(
                         raise requests.exceptions.ReadTimeout(f"Request timed out after {timeout} seconds")
 
                     try:
+                        # 在发送请求前添加短暂延迟，避免触发API并发限制
+                        time.sleep(0.5)  # 添加500毫秒延迟
+
                         # 发送请求，使用当前计算的超时时间
                         start_time = time.time()
                         response = requests.post(
@@ -1060,10 +1063,10 @@ def main():
         test_results = {}  # 记录测试结果：{并发数: (成功率, 效率)}
 
         # 首先测试几个基础点
-        # 对于GLM模型，限制最大并发数为5，避免触发API限制
+        # 对于GLM模型，限制最大并发数为1，避免触发API限制
         if model.startswith('glm-'):
-            max_concurrent = min(5, args.jobs)
-            test_points = [1, 2, 3, 4, 5]
+            max_concurrent = min(1, args.jobs)
+            test_points = [1]
         else:
             max_concurrent = args.jobs
             test_points = [1, 2, 4, 8]
