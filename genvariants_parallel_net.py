@@ -74,6 +74,7 @@ def get_endpoints() -> Dict[str, str]:
     # 如果没有环境变量，添加默认的智谱API端点
     result['glm-4.6'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 最新模型
     result['glm-4.5-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 快速模型
+    result['glm-4.5-air'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'  # 轻量模型
     result['glm-4-flash'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
     result['glm-4'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
     result['glm-4-air'] = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
