@@ -337,6 +337,8 @@ def generate_corpus(module_path, input_seeds: str, worker_dir, args):
     module_name = os.path.basename(module_path)
     # Copy the module to the output directory
     copied_module_name = os.path.join(worker_dir, module_name)
+    # Create parent directories if they don't exist
+    os.makedirs(os.path.dirname(copied_module_name), exist_ok=True)
     shutil.copyfile(module_path, copied_module_name)
     actual_module_name = os.path.join(worker_dir, module_name)
     
