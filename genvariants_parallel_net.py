@@ -672,7 +672,9 @@ def generate_variant(i, generators, model, filename, args):
     olines = orig.count('\n')
     # Output filenames
     out_file = f'var_{i:04}.{generator}{ext}'
-    out_path = os.path.join(args.output_dir,out_file)
+    # 确保output_dir不以斜杠结尾，并规范化路径
+    normalized_output_dir = os.path.normpath(args.output_dir)
+    out_path = os.path.join(normalized_output_dir, out_file)
     meta_file = os.path.join(args.log_dir, out_file + '.json')
 
     res = generate_completion(

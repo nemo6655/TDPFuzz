@@ -82,7 +82,7 @@ cli:
     # immutable region not subject to mutation. (default: 0)
     start_line: 56
     # Number of inference jobs to run in parallel (default: 16)
-    jobs: 2
+    jobs: 5
 
     # Generation parameters
     gen:
