@@ -943,6 +943,9 @@ def main():
                     future = executor.submit(generate_variant, i, generators, model, filename, args)
                     futures.append(future)
 
+                # 收集所有生成的文件路径
+                generated_files = []
+
                 # 统计成功和失败的任务
                 success_count = 0
                 failure_count = 0
@@ -958,7 +961,7 @@ def main():
                     if interrupted:
                         print("收到中断信号，正在停止任务...", file=sys.stderr)
                         executor.shutdown(wait=False)
-                        return True, success_count, failure_count
+                        return generated_files
 
                     # 使用短超时等待任务完成
                     done_futures = []
@@ -978,6 +981,7 @@ def main():
                             res = future.result()
                             if res is not None:
                                 print(res, flush=True)
+                                generated_files.append(res)
                                 success_count += 1
                             else:
                                 failure_count += 1
@@ -1016,7 +1020,7 @@ def main():
                         if interrupted:
                             print("收到中断信号，正在停止任务...", file=sys.stderr)
                             executor.shutdown(wait=False)
-                            return True, success_count, failure_count
+                            return generated_files
 
                         if not future.done():
                             try:
@@ -1025,13 +1029,14 @@ def main():
                                     if interrupted:
                                         print("收到中断信号，正在停止任务...", file=sys.stderr)
                                         executor.shutdown(wait=False)
-                                        return True, success_count, failure_count
+                                        return generated_files
                                     time.sleep(0.1)  # 短暂休眠，避免CPU占用过高
 
                                 # 任务已完成，获取结果
                                 res = future.result()
                                 if res is not None:
                                     print(res, flush=True)
+                                    generated_files.append(res)
                                     success_count += 1
                                 else:
                                     failure_count += 1
@@ -1042,7 +1047,7 @@ def main():
                 # 打印统计信息
                 print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
 
-                return rate_limit_hit, success_count, failure_count
+                return generated_files
 
         # 尝试加载之前保存的最佳并发数
         saved_best_jobs = load_best_jobs(model)
@@ -1096,8 +1101,12 @@ def main():
 
             print(f"测试并发数: {jobs}", flush=True, file=sys.stderr)
             start_time = time.time()
-            rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
+            generated_files = try_with_jobs(jobs)
             elapsed_time = time.time() - start_time
+
+            # 计算成功数
+            success_count = len(generated_files)
+            failure_count = len(worklist) - success_count
 
             # 计算效率（成功数/时间）
             efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
@@ -1112,9 +1121,9 @@ def main():
                 best_efficiency = efficiency
                 best_success = success_count
 
-            # 如果遇到429错误，停止测试更高的并发数
-            if rate_limit_hit:
-                print(f"并发数 {jobs} 遇到限制，停止测试更高的并发数", flush=True)
+            # 如果生成的文件数少于工作列表长度，可能遇到了限制
+            if success_count < len(worklist):
+                print(f"并发数 {jobs} 可能遇到限制，成功生成 {success_count}/{len(worklist)} 个文件", flush=True)
                 # 如果当前测试的并发数大于1，尝试更小的并发数
                 if jobs > 1:
                     # 添加更小的测试点
@@ -1164,8 +1173,12 @@ def main():
 
                 print(f"精细化测试并发数: {jobs}", flush=True, file=sys.stderr)
                 start_time = time.time()
-                rate_limit_hit, success_count, failure_count = try_with_jobs(jobs)
+                generated_files = try_with_jobs(jobs)
                 elapsed_time = time.time() - start_time
+
+                # 计算成功数
+                success_count = len(generated_files)
+                failure_count = len(worklist) - success_count
 
                 # 计算效率
                 efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
@@ -1180,9 +1193,9 @@ def main():
                     best_efficiency = efficiency
                     best_success = success_count
 
-                # 如果遇到429错误，停止测试更高的并发数
-                if rate_limit_hit:
-                    print(f"并发数 {jobs} 遇到限制，停止测试更高的并发数", flush=True)
+                # 如果生成的文件数少于工作列表长度，可能遇到了限制
+                if success_count < len(worklist):
+                    print(f"并发数 {jobs} 可能遇到限制，成功生成 {success_count}/{len(worklist)} 个文件", flush=True)
                     break
 
         # 打印所有测试结果
@@ -1200,7 +1213,9 @@ def main():
         # 使用最佳并发数重新运行所有任务（如果之前的尝试被中断）
         if best_jobs < args.jobs and not interrupted:
             print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
-            try_with_jobs(best_jobs)
+            generated_files = try_with_jobs(best_jobs)
+            for file_path in generated_files:
+                print(file_path, flush=True)
     else:
         # pbar = tqdm(total=len(worklist), desc='Generating', unit='variant')
         with ThreadPoolExecutor(max_workers=args.jobs) as executor:
