@@ -25,7 +25,7 @@ _cached_glm_api_key = None
 def signal_handler(sig, frame):
     """处理Ctrl+C中断信号"""
     global interrupted
-    print("\n\n收到中断信号，正在停止程序...", file=sys.stderr)
+    # print("\n\n收到中断信号，正在停止程序...", file=sys.stderr)
     interrupted = True
 
 
@@ -106,7 +106,8 @@ def get_endpoints() -> Dict[str, str]:
                         (model, endpoint) = endpoint_pair.split(':', 1)
                         result[model] = endpoint
     except Exception as e:
-        print(f"Warning: Could not load endpoints from config file: {e}", file=sys.stderr)
+        pass
+        # print(f"Warning: Could not load endpoints from config file: {e}", file=sys.stderr)
 
     return result
 
@@ -205,7 +206,8 @@ def generate_completion_glm(
             # 检查是否收到中断信号
             global interrupted
             if interrupted:
-                print("收到中断信号，停止API请求...", file=sys.stderr)
+                pass
+                # print("收到中断信号，停止API请求...", file=sys.stderr)
                 return {
                     "error": "Interrupted by user"
                 }
@@ -226,7 +228,8 @@ def generate_completion_glm(
                 for req_attempt in range(max_attempts):
                     # 检查是否收到中断信号
                     if interrupted:
-                        print("收到中断信号，停止API请求...", file=sys.stderr)
+                        pass
+                        # print("收到中断信号，停止API请求...", file=sys.stderr)
                         return {
                             "error": "Interrupted by user"
                         }
@@ -261,7 +264,8 @@ def generate_completion_glm(
                         cumulative_time += request_time
 
                         # 打印超时信息，帮助用户了解请求状态
-                        print(f"请求超时 ({short_timeout}s)，累计等待时间: {cumulative_time:.1f}s/{timeout}s，正在重试...", file=sys.stderr)
+                        pass
+                        # print(f"请求超时 ({short_timeout}s)，累计等待时间: {cumulative_time:.1f}s/{timeout}s，正在重试...", file=sys.stderr)
 
                         # 如果不是最后一次尝试，继续
                         if req_attempt < max_attempts - 1 and cumulative_time < timeout:
@@ -301,7 +305,7 @@ def generate_completion_glm(
                 elif response.status_code == 429:
                     # 遇到429错误，使用指数退避策略
                     delay = min(30, base_delay * (2 ** attempt))  # 指数增长，最多30秒
-                    print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 错误: API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
+                    # print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 错误: API并发限制 (429)，等待 {delay} 秒后重试...", file=sys.stderr)
 
                     # 在等待期间检查中断信号
                     for i in range(int(delay)):
@@ -320,7 +324,7 @@ def generate_completion_glm(
                             "error": f"GLM API rate limit error after {max_retries} attempts: {response.status_code} - {response.text}"
                         }
                 else:
-                    print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
+                    # print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
                     if attempt < max_retries - 1:
                         print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
                         continue
@@ -332,7 +336,7 @@ def generate_completion_glm(
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as e:
                 if attempt < max_retries - 1:  # 如果不是最后一次尝试
                     delay = min(30, base_delay * (2 ** attempt))  # 指数退避
-                    print(f"智谱AI调用失败 - 模型: {model_name}, 异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                    # print(f"智谱AI调用失败 - 模型: {model_name}, 异常: {str(e)}, 等待 {delay} 秒后重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
 
                     # 在等待期间检查中断信号
                     for i in range(int(delay)):
@@ -354,7 +358,8 @@ def generate_completion_glm(
 
         # 检查是否是429错误（并发限制）
         if response and response.status_code == 429:
-            print(f"智谱AI调用最终失败 - 模型: {model_name}, API并发限制错误 (429): {response.text}", file=sys.stderr)
+            pass
+            # print(f"智谱AI调用最终失败 - 模型: {model_name}, API并发限制错误 (429): {response.text}", file=sys.stderr)
 
         return {
             "error": error_msg
@@ -1256,9 +1261,10 @@ def save_best_jobs(model: str, best_jobs: int):
         with open(config_file, 'w') as f:
             json.dump(config, f, indent=2)
 
-        print(f"已保存模型 {model} 的最佳并发数 {best_jobs} 到配置文件", flush=True)
+        # print(f"已保存模型 {model} 的最佳并发数 {best_jobs} 到配置文件", flush=True)
     except Exception as e:
-        print(f"保存最佳并发数时出错: {str(e)}", file=sys.stderr)
+        pass
+        # print(f"保存最佳并发数时出错: {str(e)}", file=sys.stderr)
 
 def validate_function_completeness(code: str) -> bool:
     """验证生成的函数是否完整，特别是generate_json函数"""
@@ -1298,7 +1304,7 @@ def validate_function_completeness(code: str) -> bool:
         # 如果没有找到函数结束，认为不完整
         return True
     except Exception as e:
-        print(f"验证函数完整性时发生错误: {e}", file=sys.stderr)
+        # print(f"验证函数完整性时发生错误: {e}", file=sys.stderr)
         return False
 
 def complete_incomplete_function(code: str) -> Optional[str]:
@@ -1353,7 +1359,7 @@ def complete_incomplete_function(code: str) -> Optional[str]:
 
         return None
     except Exception as e:
-        print(f"补全函数时发生错误: {e}", file=sys.stderr)
+        # print(f"补全函数时发生错误: {e}", file=sys.stderr)
         return None
 
 def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
@@ -1367,7 +1373,7 @@ def fix_syntax_errors(code: str, error: SyntaxError) -> Optional[str]:
         # 如果简单修复失败，尝试使用GLM模型进行智能纠错
         return ai_syntax_fix(code, error)
     except Exception as e:
-        print(f"修复语法错误时发生异常: {e}", file=sys.stderr)
+        # print(f"修复语法错误时发生异常: {e}", file=sys.stderr)
         return None
 
 def simple_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
@@ -1433,7 +1439,7 @@ def simple_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
         # 如果无法自动修复，返回None
         return None
     except Exception as e:
-        print(f"简单语法修复时发生异常: {e}", file=sys.stderr)
+        # print(f"简单语法修复时发生异常: {e}", file=sys.stderr)
         return None
 
 def ai_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
@@ -1442,7 +1448,7 @@ def ai_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
         # 获取端点信息
         endpoints = get_endpoints()
         if not endpoints:
-            print("无法获取API端点信息，跳过AI语法修复", file=sys.stderr)
+            # print("无法获取API端点信息，跳过AI语法修复", file=sys.stderr)
             return None
 
         # 使用可用的GLM模型，优先使用性能更好的模型
@@ -1455,7 +1461,7 @@ def ai_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
                 break
 
         if not model_name or not endpoint:
-            print("没有可用的GLM模型，跳过AI语法修复", file=sys.stderr)
+            # print("没有可用的GLM模型，跳过AI语法修复", file=sys.stderr)
             return None
 
         # 构建纠错提示，使用更明确的指令
@@ -1498,18 +1504,18 @@ def ai_syntax_fix(code: str, error: SyntaxError) -> Optional[str]:
             # 验证修复后的代码语法是否正确
             try:
                 compile(fixed_code, '<string>', 'exec')
-                print("使用GLM模型成功修复语法错误", file=sys.stderr)
+                # print("使用GLM模型成功修复语法错误", file=sys.stderr)
                 return fixed_code
             except SyntaxError as e:
-                print(f"GLM模型修复后的代码仍有语法错误: {e}", file=sys.stderr)
+                # print(f"GLM模型修复后的代码仍有语法错误: {e}", file=sys.stderr)
                 # 如果仍然有语法错误，尝试再次修复
                 return None
         else:
-            print(f"GLM API返回错误: {response}", file=sys.stderr)
+            # print(f"GLM API返回错误: {response}", file=sys.stderr)
             return None
 
     except Exception as e:
-        print(f"AI语法修复时发生异常: {e}", file=sys.stderr)
+        # print(f"AI语法修复时发生异常: {e}", file=sys.stderr)
         return None
 
 def load_best_jobs(model: str) -> Optional[int]:
@@ -1529,7 +1535,7 @@ def load_best_jobs(model: str) -> Optional[int]:
         # 返回模型的最佳并发数（如果存在）
         return config.get(model)
     except Exception as e:
-        print(f"加载最佳并发数时出错: {str(e)}", file=sys.stderr)
+        # print(f"加载最佳并发数时出错: {str(e)}", file=sys.stderr)
         return None
 
 def on_nsf_access() -> dict[str, str] | None:
