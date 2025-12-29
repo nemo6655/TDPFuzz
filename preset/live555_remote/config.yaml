@@ -20,10 +20,10 @@ target:
 model:
   # List of model names (default: None)
   names:
-  - glm-4.5-flash
+  - glm-4.5-air
   # List of model endpoints, formatted as name:endpoint (default: None)
   endpoints:
-  - glm-4.5-flash:https://open.bigmodel.cn/api/paas/v4/chat/completions
+  - glm-4.5-air:https://open.bigmodel.cn/api/paas/v4/chat/completions
   # - codellama/CodeLlama-13b-hf:http://175.6.27.232:8192
 
 # Options to configure the run of the evolutionary algorithm
