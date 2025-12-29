@@ -286,12 +286,12 @@ def generate_completion_glm(
                         completion_tokens = usage_info.get("completion_tokens", 0)
                         total_tokens = usage_info.get("total_tokens", 0)
 
-                        print(f"智谱AI调用成功 - 模型: {model_name}, "
-                              f"提示词tokens: {prompt_tokens}, "
-                              f"生成tokens: {completion_tokens}, "
-                              f"总tokens: {total_tokens}, "
-                              f"完成原因: {result['choices'][0].get('finish_reason', 'unknown')}", 
-                              flush=True, file=sys.stderr)
+                        # print(f"智谱AI调用成功 - 模型: {model_name}, "
+                        #       f"提示词tokens: {prompt_tokens}, "
+                        #       f"生成tokens: {completion_tokens}, "
+                        #       f"总tokens: {total_tokens}, "
+                        #       f"完成原因: {result['choices'][0].get('finish_reason', 'unknown')}",
+                        #       flush=True, file=sys.stderr)
 
                         return {
                             "generated_text": result["choices"][0]["message"]["content"],
@@ -316,7 +316,7 @@ def generate_completion_glm(
                             }
                         time.sleep(1)
                     if attempt < max_retries - 1:
-                        print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                        # print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
                         continue
                     else:
                         # 最后一次尝试失败，返回错误信息
@@ -326,7 +326,7 @@ def generate_completion_glm(
                 else:
                     # print(f"智谱AI调用失败 - 模型: {model_name}, 状态码: {response.status_code}, 响应内容: {response.text[:100]}...", file=sys.stderr)
                     if attempt < max_retries - 1:
-                        print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
+                        # print(f"正在重试 ({attempt + 1}/{max_retries})...", file=sys.stderr)
                         continue
                     else:
                         # 最后一次尝试失败，返回错误信息
@@ -341,7 +341,7 @@ def generate_completion_glm(
                     # 在等待期间检查中断信号
                     for i in range(int(delay)):
                         if interrupted:
-                            print("收到中断信号，停止等待重试...", file=sys.stderr)
+                            # print("收到中断信号，停止等待重试...", file=sys.stderr)
                             return {
                                 "error": "Interrupted by user"
                             }
