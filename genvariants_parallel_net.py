@@ -932,13 +932,13 @@ def main():
             nonlocal worklist, generators, model, endpoint, args
             global interrupted
 
-            print(f"尝试使用并发数: {jobs}", flush=True, file=sys.stderr)
+            # print(f"尝试使用并发数: {jobs}", flush=True, file=sys.stderr)
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 futures = []
                 for i, filename in worklist:
                     # 检查是否收到中断信号
                     if interrupted:
-                        print("收到中断信号，正在停止任务提交...", file=sys.stderr)
+                        # print("收到中断信号，正在停止任务提交...", file=sys.stderr)
                         break
                     future = executor.submit(generate_variant, i, generators, model, filename, args)
                     futures.append(future)
@@ -959,7 +959,7 @@ def main():
                 while futures:
                     # 检查是否收到中断信号
                     if interrupted:
-                        print("收到中断信号，正在停止任务...", file=sys.stderr)
+                        # print("收到中断信号，正在停止任务...", file=sys.stderr)
                         executor.shutdown(wait=False)
                         return generated_files
 
@@ -986,7 +986,7 @@ def main():
                             else:
                                 failure_count += 1
                         except Exception as e:
-                            print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                            # print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
                             failure_count += 1
 
                         completed_count += 1
@@ -994,7 +994,7 @@ def main():
                         # 检查是否有429错误
                         if has_rate_limit_error(futures):
                             rate_limit_hit = True
-                            print(f"检测到API并发限制错误 (429)", file=sys.stderr)
+                            # print(f"检测到API并发限制错误 (429)", file=sys.stderr)
                             break
 
                         # 如果已经检查了足够多的任务且没有429错误，继续执行
@@ -1005,7 +1005,7 @@ def main():
                     # 检查是否有429错误
                     if has_rate_limit_error(futures):
                         rate_limit_hit = True
-                        print(f"检测到API并发限制错误 (429)", file=sys.stderr)
+                        # print(f"检测到API并发限制错误 (429)", file=sys.stderr)
                         break
 
                     # 如果已经检查了足够多的任务且没有429错误，继续执行
@@ -1018,7 +1018,7 @@ def main():
                     for future in futures:
                         # 检查是否收到中断信号
                         if interrupted:
-                            print("收到中断信号，正在停止任务...", file=sys.stderr)
+                            # print("收到中断信号，正在停止任务...", file=sys.stderr)
                             executor.shutdown(wait=False)
                             return generated_files
 
@@ -1027,7 +1027,7 @@ def main():
                                 # 使用超时机制，每秒检查一次中断信号
                                 while not future.done():
                                     if interrupted:
-                                        print("收到中断信号，正在停止任务...", file=sys.stderr)
+                                        # print("收到中断信号，正在停止任务...", file=sys.stderr)
                                         executor.shutdown(wait=False)
                                         return generated_files
                                     time.sleep(0.1)  # 短暂休眠，避免CPU占用过高
@@ -1041,18 +1041,18 @@ def main():
                                 else:
                                     failure_count += 1
                             except Exception as e:
-                                print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
+                                # print(f"处理任务时发生异常: {str(e)}", file=sys.stderr)
                                 failure_count += 1
 
                 # 打印统计信息
-                print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
+                # print(f"任务完成: 成功 {success_count}, 失败 {failure_count}", flush=True)
 
                 return generated_files
 
         # 尝试加载之前保存的最佳并发数
         saved_best_jobs = load_best_jobs(model)
         if saved_best_jobs:
-            print(f"从配置文件加载到模型 {model} 的最佳并发数: {saved_best_jobs}", flush=True)
+            # print(f"从配置文件加载到模型 {model} 的最佳并发数: {saved_best_jobs}", flush=True)
             # 如果保存的最佳并发数小于请求的并发数，使用保存的值作为初始值
             if saved_best_jobs < args.jobs:
                 best_jobs = saved_best_jobs
@@ -1096,10 +1096,10 @@ def main():
         for jobs in test_points:
             # 检查是否收到中断信号
             if interrupted:
-                print("收到中断信号，正在停止测试...", file=sys.stderr)
+                # print("收到中断信号，正在停止测试...", file=sys.stderr)
                 break
 
-            print(f"测试并发数: {jobs}", flush=True, file=sys.stderr)
+            # print(f"测试并发数: {jobs}", flush=True, file=sys.stderr)
             start_time = time.time()
             generated_files = try_with_jobs(jobs)
             elapsed_time = time.time() - start_time
@@ -1112,8 +1112,8 @@ def main():
             efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
             test_results[jobs] = (success_count, efficiency)
 
-            print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True,
-                  file=sys.stderr)
+            # print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s", flush=True,
+        #       file=sys.stderr)
 
             # 更新最佳值
             if efficiency > best_efficiency:
@@ -1123,7 +1123,7 @@ def main():
 
             # 如果生成的文件数少于工作列表长度，可能遇到了限制
             if success_count < len(worklist):
-                print(f"并发数 {jobs} 可能遇到限制，成功生成 {success_count}/{len(worklist)} 个文件", flush=True)
+                # print(f"并发数 {jobs} 可能遇到限制，成功生成 {success_count}/{len(worklist)} 个文件", flush=True)
                 # 如果当前测试的并发数大于1，尝试更小的并发数
                 if jobs > 1:
                     # 添加更小的测试点
@@ -1168,10 +1168,10 @@ def main():
             for jobs in fine_test_points:
                 # 检查是否收到中断信号
                 if interrupted:
-                    print("收到中断信号，正在停止精细化测试...", file=sys.stderr)
+                    # print("收到中断信号，正在停止精细化测试...", file=sys.stderr)
                     break
 
-                print(f"精细化测试并发数: {jobs}", flush=True, file=sys.stderr)
+                # print(f"精细化测试并发数: {jobs}", flush=True, file=sys.stderr)
                 start_time = time.time()
                 generated_files = try_with_jobs(jobs)
                 elapsed_time = time.time() - start_time
@@ -1184,8 +1184,8 @@ def main():
                 efficiency = success_count / elapsed_time if elapsed_time > 0 else 0
                 test_results[jobs] = (success_count, efficiency)
 
-                print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s",
-                      flush=True, file=sys.stderr)
+                # print(f"并发数 {jobs}: 成功 {success_count}, 效率 {efficiency:.2f}/s, 耗时 {elapsed_time:.2f}s",
+        #               flush=True, file=sys.stderr)
 
                 # 更新最佳值
                 if efficiency > best_efficiency:
@@ -1195,24 +1195,24 @@ def main():
 
                 # 如果生成的文件数少于工作列表长度，可能遇到了限制
                 if success_count < len(worklist):
-                    print(f"并发数 {jobs} 可能遇到限制，成功生成 {success_count}/{len(worklist)} 个文件", flush=True)
+                    # print(f"并发数 {jobs} 可能遇到限制，成功生成 {success_count}/{len(worklist)} 个文件", flush=True)
                     break
 
         # 打印所有测试结果
-        print("\n所有测试结果:", flush=True)
-        for jobs, (success, efficiency) in sorted(test_results.items()):
-            print(f"并发数 {jobs}: 成功 {success}, 效率 {efficiency:.2f}/s", flush=True)
+        # print("\n所有测试结果:", flush=True)
+        # for jobs, (success, efficiency) in sorted(test_results.items()):
+            # print(f"并发数 {jobs}: 成功 {success}, 效率 {efficiency:.2f}/s", flush=True)
 
-        print(
-            f"\n最终使用并发数: {best_jobs}，效率 {best_efficiency:.2f}/s，效率 {best_efficiency:.2f}/s，成功生成 {best_success} 个变体",
-            flush=True)
+        # print(
+        #     f"\n最终使用并发数: {best_jobs}，效率 {best_efficiency:.2f}/s，效率 {best_efficiency:.2f}/s，成功生成 {best_success} 个变体",
+        #     flush=True)
 
         # 保存找到的最佳并发数
         save_best_jobs(model, best_jobs)
 
         # 使用最佳并发数重新运行所有任务（如果之前的尝试被中断）
         if best_jobs < args.jobs and not interrupted:
-            print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
+            # print(f"使用最佳并发数 {best_jobs} 重新运行所有任务", flush=True)
             generated_files = try_with_jobs(best_jobs)
             for file_path in generated_files:
                 print(file_path, flush=True)
