@@ -68,3 +68,8 @@ evaluation/nocomp_fuzzers/
 evaluation/noinf_fuzzers/
 evaluation/nospl_fuzzers/
 evaluation/
+
+.vscode/*
+
+
+
