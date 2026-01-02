@@ -63,8 +63,11 @@ EXIT_CODE=$(docker wait "$CONTAINER_ID")
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "Docker container finished successfully."
     
+# 获取当前日期
+    CURRENT_DATE=$(date +%Y%m%d)
+
     # 创建临时目录
-    TMP_DIR="/tmp/tdpfuzz_eval_$TEST_NUMBER"
+    TMP_DIR="/tmp/tdpfuzz_eval_${CURRENT_DATE}_${TEST_OBJECT}_${TEST_NUMBER}"
     mkdir -p "$TMP_DIR"
     
     # 从容器复制 evaluation 目录
@@ -122,8 +125,10 @@ if [ "$EXIT_CODE" -eq 0 ]; then
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
             ;;
         forkeddaapd)
-            DOCKER_CMD="docker run -d -it -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash forked-daapd:latest -c \"cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 3689 30 /home/ubuntu/input/cov_over_time_${TEST_OBJECT}_${TEST_NUMBER}.csv 1\""
-            echo "Executing Docker command: $DOCKER_CMD"
+            # sudo /etc/init.d/dbus start
+            # sudo /etc/init.d/avahi-daemon start
+            # sudo /etc/init.d/dbus status
+            DOCKER_CMD="docker run -dit -v \"$TEST_OUTPUTS\":/home/ubuntu/input/ --entrypoint /bin/bash forked-daapd:latest -c \"sudo /etc/init.d/dbus start && sudo /etc/init.d/avahi-daemon start && sudo /etc/init.d/dbus status && cd /home/ubuntu/experiments/ && cov_script /home/ubuntu/input/ 3689 30 /home/ubuntu/input/cov_over_time_$TEST_OBJECT.csv 1\""
             CONTAINER_ID=$(eval "$DOCKER_CMD")
             echo "Container ID: $CONTAINER_ID"
             EXIT_CODE=$(docker wait "$CONTAINER_ID")
