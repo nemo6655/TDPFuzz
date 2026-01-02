@@ -48,6 +48,7 @@ run:
   logdir: '{ELMFUZZ_RUNDIR}/{GEN}/logs'
   # Clean the output directories before running (default: False)
   clean: true
+  rescue: false
 
   state_pools:
   - '0000'
