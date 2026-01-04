@@ -1,5 +1,5 @@
 diff --git a/afl-fuzz.c b/afl-fuzz.c
-index 8023451..4e79c7b 100644
+index 8023451..c1d8fa4 100644
 --- a/afl-fuzz.c
 +++ b/afl-fuzz.c
 @@ -544,6 +544,14 @@ u8* choose_source_region(u32 *out_len) {
@@ -104,7 +104,59 @@ index 8023451..4e79c7b 100644
  
      /* Check for metadata that indicates that deterministic fuzzing
         is complete for this entry. We don't want to repeat deterministic
-@@ -3482,6 +3516,55 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
+@@ -3355,7 +3389,50 @@ static void write_to_testcase(void* mem, u32 len) {
+ 
+   } else lseek(fd, 0, SEEK_SET);
+ 
+-  ck_write(fd, mem, len, out_file);
++  {
++
++    u32 sent = 0;
++    s32 res;
++    u32 retries = 0;
++
++    if (len && !mem) {
++       if (out_file) close(fd);
++       return;
++    }
++
++    while (sent < len) {
++
++      res = write(fd, (u8*)mem + sent, len - sent);
++
++      if (res < 0) {
++
++        if (errno == EINTR) continue;
++        if (errno == EFAULT) {
++           WARNF("Bad address in write_to_testcase (len=%u, sent=%u)", len, sent);
++           break;
++        }
++        PFATAL("Unable to write to '%s'", out_file ? out_file : (u8*)"default input");
++
++      }
++
++      if (res == 0) {
++
++        if (retries < 3) {
++          usleep(1000);
++          retries++;
++          continue;
++        }
++
++        FATAL("Short write to '%s' (len=%u, sent=%u)", out_file ? out_file : (u8*)"default input", len, sent);
++
++      }
++
++      sent += res;
++      retries = 0;
++
++    }
++
++  }
+ 
+   if (!out_file) {
+ 
+@@ -3482,6 +3559,55 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
  
    update_bitmap_score(q);
  
@@ -160,7 +212,7 @@ index 8023451..4e79c7b 100644
    /* If this case didn't result in new output from the instrumentation, tell
       parent. This is a non-critical problem, but something to warn the user
       about. */
-@@ -3573,7 +3656,7 @@ static void perform_dry_run(char** argv) {
+@@ -3573,7 +3699,7 @@ static void perform_dry_run(char** argv) {
      ck_free(use_mem);
  
      /* Update state-aware variables (e.g., state machine, regions and their annotations */
@@ -169,7 +221,7 @@ index 8023451..4e79c7b 100644
  
      /* save the seed to file for replaying */
      u8 *fn_replay = alloc_printf("%s/replayable-queue/%s", out_dir, basename(q->fname));
-@@ -3649,6 +3732,18 @@ static void perform_dry_run(char** argv) {
+@@ -3649,6 +3775,18 @@ static void perform_dry_run(char** argv) {
            break;
          }
  
@@ -188,7 +240,7 @@ index 8023451..4e79c7b 100644
          if (mem_limit) {
  
            SAYF("\n" cLRD "[-] " cRST
-@@ -3666,7 +3761,8 @@ static void perform_dry_run(char** argv) {
+@@ -3666,7 +3804,8 @@ static void perform_dry_run(char** argv) {
  
  #ifdef RLIMIT_AS
                 "      ( ulimit -Sv $[%llu << 10]; /path/to/binary [...] <testcase )\n\n"
@@ -198,7 +250,7 @@ index 8023451..4e79c7b 100644
                 "      ( ulimit -Sd $[%llu << 10]; /path/to/binary [...] <testcase )\n\n"
  #endif /* ^RLIMIT_AS */
  
-@@ -3995,6 +4091,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
+@@ -3995,6 +4134,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
  
      fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
                        describe_op(hnb));
@@ -206,7 +258,7 @@ index 8023451..4e79c7b 100644
  
  #else
  
-@@ -4624,6 +4721,10 @@ static void maybe_delete_out_dir(void) {
+@@ -4624,6 +4764,10 @@ static void maybe_delete_out_dir(void) {
    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
    ck_free(fn);
  
@@ -217,7 +269,7 @@ index 8023451..4e79c7b 100644
    /* Then, get rid of the .state subdirectory itself (should be empty by now)
       and everything matching <out_dir>/queue/id:*. */
  
-@@ -5821,6 +5922,8 @@ static u8 fuzz_one(char** argv) {
+@@ -5821,6 +5965,8 @@ static u8 fuzz_one(char** argv) {
  
    u8  ret_val = 1, doing_det = 0;
  
@@ -226,7 +278,7 @@ index 8023451..4e79c7b 100644
    u8  a_collect[MAX_AUTO_EXTRA];
    u32 a_len = 0;
  
-@@ -7542,7 +7645,7 @@ retry_splicing:
+@@ -7542,7 +7688,7 @@ retry_splicing:
  
      /* Make sure that the target has a reasonable length. */
  
@@ -235,7 +287,7 @@ index 8023451..4e79c7b 100644
        target = target->next;
        splicing_with++;
      }
-@@ -8174,6 +8277,10 @@ EXP_ST void setup_dirs_fds(void) {
+@@ -8174,6 +8320,10 @@ EXP_ST void setup_dirs_fds(void) {
    if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
    ck_free(tmp);
  
