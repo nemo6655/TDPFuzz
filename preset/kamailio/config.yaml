@@ -24,7 +24,7 @@ model:
   # List of model endpoints, formatted as name:endpoint (default: None)
   endpoints:
   - codellama/CodeLlama-13b-hf:http://192.168.31.53:8192
-  #- codellama/CodeLlama-13b-hf:http://175.6.27.232:8192
+
 
 # Options to configure the run of the evolutionary algorithm
 run:
