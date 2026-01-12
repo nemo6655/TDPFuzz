@@ -10,6 +10,19 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import autopep8
 import textwrap
+import signal
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+def signal_handler(signum, frame):
+    global shutdown_requested
+    print(f"Received signal {signum}, requesting shutdown...", file=sys.stderr)
+    shutdown_requested = True
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 def get_endpoints() -> Dict[str, str]:
     result = dict()
@@ -22,7 +35,11 @@ def get_endpoints() -> Dict[str, str]:
 
 def model_info():
     """Get information about the model."""
-    return requests.get(f'{ENDPOINT}/info').json()
+    endpoints = get_endpoints()
+    endpoint = endpoints.get('codellama/CodeLlama-13b-hf')
+    if not endpoint:
+        raise ValueError("No endpoint found for codellama/CodeLlama-13b-hf")
+    return requests.get(f'{endpoint}/info', timeout=30).json()
 
 def generate_completion(
         prompt,
@@ -32,6 +49,11 @@ def generate_completion(
         stop=None,
 ):
     """Generate a completion of the prompt."""
+    endpoints = get_endpoints()
+    endpoint = endpoints.get('codellama/CodeLlama-13b-hf')
+    if not endpoint:
+        raise ValueError("No endpoint found for codellama/CodeLlama-13b-hf")
+    
     data = {
         'inputs': prompt,
         'parameters': {
@@ -45,9 +67,12 @@ def generate_completion(
     if stop is not None:
         data['parameters']['stop'] = stop
     try:
-        response = requests.post(f'{ENDPOINT}/generate', json=data)
+        response = requests.post(f'{endpoint}/generate', json=data, timeout=300)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        print(f"Request timed out after 300 seconds", file=sys.stderr)
+        return {"error": "Request timeout"}
     except requests.exceptions.RequestException as e:
         error_res = {"error": f"Request failed: {e}"}
         if e.response is not None:
@@ -544,10 +569,20 @@ def main():
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
         futures = []
         for i, filename in worklist:
+            if shutdown_requested:
+                print("Shutdown requested, stopping new task submissions...", file=sys.stderr)
+                break
             future = executor.submit(generate_variant, i, generators, model, filename, args)
             # future.add_done_callback(lambda _: pbar.update())
             futures.append(future)
         for future in as_completed(futures):
+            if shutdown_requested:
+                print("Shutdown requested, canceling remaining tasks...", file=sys.stderr)
+                # Cancel remaining futures
+                for f in futures:
+                    if not f.done():
+                        f.cancel()
+                break
             res = future.result()
             if res is not None:
                 print(res, flush=True)
@@ -563,5 +598,4 @@ def on_nsf_access() -> dict[str, str] | None:
 
 if __name__ == '__main__':
     access_info = on_nsf_access()
-    ENDPOINT = get_endpoints()['codellama/CodeLlama-13b-hf'] if access_info is None else access_info['endpoint']
     main()

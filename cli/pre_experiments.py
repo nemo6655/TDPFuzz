@@ -261,6 +261,14 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
         else:
             cmd = ["sudo", "REPROUDCE_MODE=true", os.path.join(PROJECT_ROOT, "all_gen_net.sh"), rundir]
         print(f"Running command: {' '.join(cmd)}", flush=True)
+        
+        # Pass the environment variables to the subprocess
+        # Note: sudo might strip environment variables, so we need to pass them explicitly or use -E
+        if "TDPFUZZ_FORBIDDEN" in env:
+            cmd.insert(1, f"TDPFUZZ_FORBIDDEN={env['TDPFUZZ_FORBIDDEN']}")
+        if "SELECTION_STRATEGY" in env:
+            cmd.insert(1, f"SELECTION_STRATEGY={env['SELECTION_STRATEGY']}")
+            
         subprocess.run(" ".join(cmd), check=True, shell=True, user=USER, cwd=PROJECT_ROOT, stdout=sys.stdout, stderr=sys.stderr)
 
         match target:
