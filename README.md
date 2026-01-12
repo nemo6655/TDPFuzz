@@ -137,3 +137,9 @@ Clean and analyze `live555`, while calculating coverage, using 8 parallel jobs:
 ```bash
 ./spcm.sh -t live555 -x -c -j 8
 ```
+
+
+## 5.Baselinse Fuzzers
+The two baseline fuzzers for comparison:
+ - ChatAFL-ZP: https://github.com/SoraCode-XP/ChatAFL.git
+ - NSFuzz: https://zenodo.org/records/7134490
