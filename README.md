@@ -3,29 +3,6 @@
 This repository contains the source code of the replication package of the paper "LLM-driven Two-Dimensional Parallel Fuzzing Framework for Stateful Network Protocols ."
 
 
-##Experiment Data
-The experiment data are published on [Zenodo](https://doi.org/10.5281/zenodo.18217434).
-
-## Replication package
-
-The code and environment to replicate the experiments are published as a Docker image. Run the following command to pull it:
-
-```bash
-docker pull nemo6655/tdpfuzz:latest
-```
-After pulling/importing the image, run the following command to start the container:
-
-```bash
-mkdir -p /tmp/host
-docker run  --cpus 20 -it --add-host=host.docker.internal:host-gateway -v /tmp/host:/tmp/host -v /var/run/docker.sock:/var/run/docker.sock --name tdpfuzz nemo6655/tdpfuzz:latest
-```
-- `--cpus 20`: Allocates 20 CPU cores to the container. This is to speed up operations such as minimizing seed test cases via parallelization.
-- `-it`: Runs the container in interactive mode with a terminal.
-- `--add-host=host.docker.internal:host-gateway`: Adds a host entry to the container so that it can access the host machine. This is needed for query the LLM served in a [sibling container](https://stackoverflow.com/questions/39151188/is-there-a-way-to-start-a-sibling-docker-container-mounting-volumes-from-the-hos).
-- `-v /tmp/host:/tmp/host`: Mounts the `/tmp/host` directory on the host machine into the container as a shared temporary directory with sibling containers.
-- `-v "/var/run/docker.sock:/var/run/docker.sock"`: Mounts the Docker socket into the container, allowing it to run sibling containers.
-- `--name tdpfuzz`: Names the container `tdpfuzz`.
-- `nemo6655/tdpfuzz:latest`: Specifies the Docker image to use.
 
 
 ## 1. Direct Execution via Python Script
