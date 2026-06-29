@@ -248,6 +248,11 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
                 "SELECTION_STRATEGY": "lattice",
                 "TDPFUZZ_FORBIDDEN": "NOSM",
             }
+        case "tdpfuzzer_np":
+            env = os.environ.copy() | {
+                "SELECTION_STRATEGY": "lattice",
+                "TDPFUZZ_FORBIDDEN": "NP",
+            }
         case _:
             raise ValueError(f"Unknown target: {target}")
 
@@ -281,6 +286,9 @@ def tdnet_fuzzer(target, benchmark, *, tgi_waiting=600, evolution_iterations=50,
             case "tdpfuzzer_nosm":
                 target_cap = "tdpfuzzer_nosm"
                 fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "tdpfuzzer_nosm")
+            case "tdpfuzzer_np":
+                target_cap = "tdpfuzzer_np"
+                fuzzer_dir = os.path.join(PROJECT_ROOT, "evaluation", "tdpfuzz_np")
 
 
         evolution_record_dir = os.path.join(PROJECT_ROOT, "extradata", "evolution_record", target_cap)

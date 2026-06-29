@@ -14,10 +14,10 @@ TEST_OBJECT=$5
 
 # 验证 fuzzer_name
 case $FUZZER_NAME in
-    tdpfuzzer.tdpfuzzer|tdpfuzzer.tdpfuzzer_noss|tdpfuzzer.tdpfuzzer_nosm)
+    tdpfuzzer.tdpfuzzer|tdpfuzzer.tdpfuzzer_noss|tdpfuzzer.tdpfuzzer_nosm|tdpfuzzer.tdpfuzzer_np)
         ;;
     *)
-        echo "Invalid fuzzer_name: $FUZZER_NAME. Must be one of: tdpfuzzer.tdpfuzzer, tdpfuzzer.tdpfuzzer_noss, tdpfuzzer.tdpfuzzer_nosm"
+        echo "Invalid fuzzer_name: $FUZZER_NAME. Must be one of: tdpfuzzer.tdpfuzzer, tdpfuzzer.tdpfuzzer_noss, tdpfuzzer.tdpfuzzer_nosm, tdpfuzzer.tdpfuzzer_np"
         exit 1
         ;;
 esac
