@@ -8,10 +8,14 @@ import math
 
 def get_state_pools():
     try:
+        # NP mode: override to single state pool (no horizontal parallelism)
+        if os.environ.get('TDPFUZZ_FORBIDDEN') == 'NP':
+            return ['0000']
+
         # Call elmconfig.py to get the state pools
         script_dir = os.path.dirname(os.path.abspath(__file__))
         elmconfig_path = os.path.join(script_dir, 'elmconfig.py')
-        
+
         result = subprocess.run(
             [sys.executable, elmconfig_path, 'get', 'run.state_pools'],
             capture_output=True, text=True, check=True
