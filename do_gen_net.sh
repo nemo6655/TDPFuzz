@@ -191,12 +191,17 @@ all_models_genout_dir=$(realpath -m "$GOOUT")
 
 case "$TYPE" in
     fuzzbench|oss-fuzz|docker|profuzzbench)
+        extra_hours=0
+        if [ "${next_gen#gen}" -eq "$num_gens" ]; then
+            extra_hours=4
+        fi
         python getcov_fuzzbench_net.py \
             --image tdpfuzz/"$PROJECT_NAME" \
             --input "$all_models_genout_dir" \
             --output "${AFLNET_OUT}" \
             --covfile "${LOGDIR}/coverage.json" \
-            --next_gen "${next_gen#gen}"
+            --next_gen "${next_gen#gen}" \
+            --extra-last-hours $extra_hours
         ;;
     *)
         python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"

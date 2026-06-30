@@ -32,9 +32,10 @@ def on_nsf_access() -> dict[str, str] | None:
 @click.option('--persist/--no-persist', type=bool, default=False)
 @click.option('--covfile', type=str, default='./cov.json')
 @click.option('--next_gen', type=int, default=1)
+@click.option('--extra-last-hours', type=int, default=0, help='Extra hours to add to the last generation')
 @click.option('-j', 'parallel_num', type=int, default=64, required=False)
 @watch(mailogger)
-def main(image: str, input: str,output:str, persist: bool, covfile: str, parallel_num: int, next_gen: int):
+def main(image: str, input: str,output:str, persist: bool, covfile: str, parallel_num: int, next_gen: int, extra_last_hours: int):
     covbin = get_config('target.covbin')
     options = get_config('target.options')
     # Normalize options to a single string for command-line usage
@@ -118,7 +119,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 50'
                     #DEBUG:
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}"  1800 50'
-                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen + 1) * 3600} {(next_gen + 1) * 20}'
+                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen + 1 + extra_last_hours) * 3600} {(next_gen + 1) * 20}'
                 ]
                 # start and return container id and run_tmp
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)
