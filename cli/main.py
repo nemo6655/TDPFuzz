@@ -116,7 +116,7 @@ def synthesize(target, benchmark, tgi_waiting, evolution_iterations, use_small_m
 
 @cli.command(name="tdnet", help="Synthesize input generators for network protocols.")
 @click.option("--target", "-T", required=True, type=click.Choice(
-    ["tdpfuzzer.tdpfuzzer", "tdpfuzzer.tdpfuzzer_noss", "tdpfuzzer.tdpfuzzer_nosm", "tdpfuzzer.tdpfuzzer_np"]
+    ["tdpfuzzer.tdpfuzzer", "tdpfuzzer.tdpfuzzer_noss", "tdpfuzzer.tdpfuzzer_nosm"]
 ))
 @click.argument("benchmark", required=True, type=click.Choice(
     ["live555", "exim", "forkeddaapd", "kamailio", "proftpd", "pureftpd"]
@@ -138,7 +138,7 @@ a random one from the constraints with the best recall and precision will be sel
 @click.option("--use-small-model", is_flag=True, default=False, help="Use Qwen2.5-Coder-1.5B instead of CodeLlama-13b-hf to verify the functionality on a GPU with limited VRAM. This option only works for targets <fuzzer.*>.")
 def tdnet(target, benchmark, tgi_waiting, evolution_iterations, use_small_model, no_select_semantic_constraints):
     match target:
-        case "tdpfuzzer.tdpfuzzer" | "tdpfuzzer.tdpfuzzer_noss" | "tdpfuzzer.tdpfuzzer_nosm" | "tdpfuzzer.tdpfuzzer_np":
+        case "tdpfuzzer.tdpfuzzer" | "tdpfuzzer.tdpfuzzer_noss" | "tdpfuzzer.tdpfuzzer_nosm":
             tdnet_fuzzer(target.split(".")[1], benchmark, tgi_waiting=tgi_waiting, evolution_iterations=evolution_iterations, use_small_model=use_small_model)
             return
         # case "grammar.glade":

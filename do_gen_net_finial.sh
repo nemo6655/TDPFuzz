@@ -19,11 +19,6 @@ STATE_POOLS=($(./elmconfig.py get run.state_pools))
 PROTOCOL_TYPE=$(./elmconfig.py get protocol_type)
 TDPFUZZ_FORBIDDEN="${TDPFUZZ_FORBIDDEN:-}"
 
-# NP mode: override to single state pool (no horizontal parallelism)
-if [ "$TDPFUZZ_FORBIDDEN" = "NP" ]; then
-    STATE_POOLS=('0000')
-fi
-
 
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
@@ -110,7 +105,7 @@ else
 
         python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
         
-        if [ -z "$TDPFUZZ_FORBIDDEN" ] || [ "$TDPFUZZ_FORBIDDEN" = "NP" ]; then
+        if [ -z "$TDPFUZZ_FORBIDDEN" ]; then
             python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --ss
         elif [ "$TDPFUZZ_FORBIDDEN" = "NOSS" ]; then
             python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --noss
