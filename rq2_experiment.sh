@@ -48,7 +48,7 @@ docker run -d \
     --name "$CONTAINER_NAME" \
     --entrypoint /bin/bash \
     "$IMAGE_NAME" \
-    -c "cd /home/appuser/elmfuzz && EXPERIMENT_GEN=gen2 SELECTION_STRATEGY=lattice REPROUDCE_MODE=true NUM_GENERATIONS=2 ELMFUZZ_RUNDIR=preset/${TARGET} /home/appuser/elmfuzz/all_gen_net.sh preset/${TARGET}"
+    -c "cd /home/appuser/elmfuzz && TDPFUZZ_FORBIDDEN=NOSM EXPERIMENT_GEN=gen2 SELECTION_STRATEGY=lattice REPROUDCE_MODE=true NUM_GENERATIONS=2 ELMFUZZ_RUNDIR=preset/${TARGET} /home/appuser/elmfuzz/all_gen_net.sh preset/${TARGET}"
 
 echo "  Container ID: $(docker ps -qf name=${CONTAINER_NAME})"
 echo ""
