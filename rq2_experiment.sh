@@ -20,7 +20,7 @@ esac
 
 IMAGE_NAME="tdpfuzz:rq2-experiment"
 CONTAINER_NAME="tdpfuzz_rq2_${TARGET}_1"
-EVAL_DIR="${HOST_CODE}/evaluation/rq2/${TARGET}"
+EVAL_DIR="/home/pzst/LLM-PROTOCOL-FUZZ/TDPFuzz/evaluation/rq2/${TARGET}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 echo "============================================"
