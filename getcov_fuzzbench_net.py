@@ -35,6 +35,7 @@ def on_nsf_access() -> dict[str, str] | None:
 @click.option('-j', 'parallel_num', type=int, default=64, required=False)
 @watch(mailogger)
 def main(image: str, input: str,output:str, persist: bool, covfile: str, parallel_num: int, next_gen: int):
+    afl_hours_override = int(os.environ.get('AFL_HOURS_OVERRIDE', 0))
     covbin = get_config('target.covbin')
     options = get_config('target.options')
     # Normalize options to a single string for command-line usage
@@ -118,7 +119,7 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(next_gen+1) * 600} 50'
                     #DEBUG:
                     # '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}"  1800 50'
-                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(9 if next_gen > 4 else next_gen + 1) * 3600} {(next_gen + 1) * 20}'
+                    '/bin/bash', '-c', f'cd /home/ubuntu/experiments && run aflnet /tmp/input {output_base} "{options}" {(afl_hours_override if afl_hours_override > 0 else (9 if next_gen > 4 else next_gen + 1)) * 3600} {(next_gen + 1) * 20}'
                 ]
                 # start and return container id and run_tmp
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)

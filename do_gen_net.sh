@@ -16,6 +16,11 @@ NUM_VARIANTS=$(./elmconfig.py get cli.genvariants_parallel.num_variants)
 LOGDIR=$(./elmconfig.py get run.logdir -s GEN=${next_gen})
 NUM_SELECTED=$(./elmconfig.py get run.num_selected)
 STATE_POOLS=($(./elmconfig.py get run.state_pools))
+# For non-experiment generations, limit to first 4 pools (0000-0003)
+# Experiment gen uses all 8 pools for elite-vs-full comparison
+if [ -z "${EXPERIMENT_GEN:-}" ] || [ "$next_gen" != "$EXPERIMENT_GEN" ]; then
+    STATE_POOLS=("${STATE_POOLS[@]:0:4}")
+fi
 PROTOCOL_TYPE=$(./elmconfig.py get protocol_type)
 TDPFUZZ_FORBIDDEN="${TDPFUZZ_FORBIDDEN:-}"
 
@@ -103,9 +108,11 @@ else
 
         
 
-        python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file 
-        
-        if [ -z "$TDPFUZZ_FORBIDDEN" ]; then
+        python select_seeds_net.py -u -g $prev_gen -n $NUM_SELECTED -c $cov_file -i $input_elite_file -o $output_elite_file
+
+        if [ -n "${EXPERIMENT_GEN:-}" ] && [ "$next_gen" = "$EXPERIMENT_GEN" ]; then
+            python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --rq2-experiment
+        elif [ -z "$TDPFUZZ_FORBIDDEN" ]; then
             python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --ss
         elif [ "$TDPFUZZ_FORBIDDEN" = "NOSS" ]; then
             python select_states_net.py -c $cov_file -e $output_elite_file -g $prev_gen --noss
@@ -144,7 +151,46 @@ fi
 VARIANT_ARGS="-n ${NUM_VARIANTS}"
 
 
-echo "Generating next generation: ${NUM_VARIANTS} variants for each seed with each model"
+# Check if this is the RQ2 experiment generation
+if [ -n "${EXPERIMENT_GEN:-}" ] && [ "$next_gen" = "$EXPERIMENT_GEN" ]; then
+    echo ""
+    echo "============================================"
+    echo "=== RQ2 EXPERIMENT MODE for $next_gen ==="
+    echo "===  8 pools, no LLM, 6h AFL             ==="
+    echo "============================================"
+
+    # Populate genoutput dirs with init seeds for each pool
+    GOOUT=$(./elmconfig.py get run.genoutput_dir -s MODEL=dummy -s GEN=${prev_gen})
+    for pool in "${STATE_POOLS[@]}"; do
+        dest="${GOOUT}/${pool}/"
+        mkdir -p "$dest"
+        cp -r $seeds "$dest" 2>/dev/null || true
+        echo "  Pool $pool: init seeds + selected seeds ready"
+    done
+
+    # Collect coverage with 6h AFL override
+    echo "Collecting coverage of the generators (RQ2 experiment, 6h AFL)"
+    all_models_genout_dir=$(realpath -m "$GOOUT")
+    export AFL_HOURS_OVERRIDE=6
+
+    case "$TYPE" in
+        fuzzbench|oss-fuzz|docker|profuzzbench)
+            python getcov_fuzzbench_net.py \
+                --image tdpfuzz/"$PROJECT_NAME" \
+                --input "$all_models_genout_dir" \
+                --output "${AFLNET_OUT}" \
+                --covfile "${LOGDIR}/coverage.json" \
+                --next_gen "${next_gen#gen}"
+            ;;
+        *)
+            python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
+            ;;
+    esac
+else
+    # ============================================================
+    # Normal mode: LLM generation loop
+    # ============================================================
+    echo "Generating next generation: ${NUM_VARIANTS} variants for each seed with each model"
 
 
 
@@ -186,22 +232,23 @@ for model_name in $MODELS ; do
 done
 
 # Collect the coverage of the generators
-echo "Collecting coverage of the generators"
-all_models_genout_dir=$(realpath -m "$GOOUT")
+    echo "Collecting coverage of the generators"
+    all_models_genout_dir=$(realpath -m "$GOOUT")
 
-case "$TYPE" in
-    fuzzbench|oss-fuzz|docker|profuzzbench)
-        python getcov_fuzzbench_net.py \
-            --image tdpfuzz/"$PROJECT_NAME" \
-            --input "$all_models_genout_dir" \
-            --output "${AFLNET_OUT}" \
-            --covfile "${LOGDIR}/coverage.json" \
-            --next_gen "${next_gen#gen}"
-        ;;
-    *)
-        python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
-        ;;
-esac
+    case "$TYPE" in
+        fuzzbench|oss-fuzz|docker|profuzzbench)
+            python getcov_fuzzbench_net.py \
+                --image tdpfuzz/"$PROJECT_NAME" \
+                --input "$all_models_genout_dir" \
+                --output "${AFLNET_OUT}" \
+                --covfile "${LOGDIR}/coverage.json" \
+                --next_gen "${next_gen#gen}"
+            ;;
+        *)
+            python getcov.py -O "${LOGDIR}/coverage.json" "$all_models_genout_dir"
+            ;;
+    esac
+fi
 
 # Plot coverage
 python analyze_cov.py -m $num_gens -p "$ELMFUZZ_RUNDIR"/*/logs/coverage.json

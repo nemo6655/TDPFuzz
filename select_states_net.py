@@ -556,22 +556,143 @@ def get_all_aflnet_dirs(elmfuzz_rundir):
             pass
     return dirs
 
+def select_states_rq2(cov_file, elites_file, gen, elmfuzz_rundir):
+    """
+    RQ2 continuation experiment:
+      Elite seeds  → pools 0000-0003 (same set in each pool)
+      All seeds    → pools 0004-0007 (same set in each pool)
+    """
+    print(f"=== RQ2 Experiment State Selection for {gen} ===")
+    print(f"Loading coverage file: {cov_file}")
+    with open(cov_file, 'r') as f:
+        cov_data = json.load(f)
+
+    print(f"Loading elites file: {elites_file}")
+    with open(elites_file, 'r') as f:
+        elites_data = json.load(f)
+
+    seed_map_cache = {}
+    global_seed_map = {}
+    global_scan_done = False
+
+    def get_cached_seed_path(gen_dir, pool, seed_prefix):
+        nonlocal global_scan_done
+        key = (gen_dir, pool)
+        if key not in seed_map_cache:
+            base_dir = os.path.join(elmfuzz_rundir, gen_dir, 'aflnetout', pool)
+            seed_map_cache[key] = get_seed_map(base_dir)
+        path = seed_map_cache[key].get(seed_prefix)
+        if path:
+            return path
+        if not global_scan_done:
+            print("Scanning all aflnetout directories for missing seeds...", file=sys.stderr)
+            all_dirs = get_all_aflnet_dirs(elmfuzz_rundir)
+            for d in all_dirs:
+                try:
+                    for f in os.listdir(d):
+                        if f.startswith("id:"):
+                            prefix = f.split(',')[0]
+                            if prefix not in global_seed_map:
+                                global_seed_map[prefix] = os.path.join(d, f)
+                except OSError:
+                    pass
+            global_scan_done = True
+        return global_seed_map.get(seed_prefix)
+
+    # State pools for the experiment
+    elite_pools = ['0000', '0001', '0002', '0003']
+    full_pools = ['0004', '0005', '0006', '0007']
+
+    # -- Step 1: Identify elite seeds --
+    elite_seed_paths = []
+
+    for prev_gen, states in elites_data.items():
+        gen_dir_name = resolve_gen_dir(elmfuzz_rundir, prev_gen)
+        for state_pool, files in states.items():
+            for filename_key in files.keys():
+                if ':state:' in filename_key:
+                    seed_name_full = filename_key.split(':state:')[0]
+                else:
+                    seed_name_full = filename_key
+                seed_id_prefix = seed_name_full.split(',')[0]
+                src_path = get_cached_seed_path(gen_dir_name, state_pool, seed_id_prefix)
+                if src_path:
+                    elite_seed_paths.append(src_path)
+                else:
+                    print(f"Warning: Elite seed not found: {seed_name_full}", file=sys.stderr)
+
+    elite_seed_paths = list(set(elite_seed_paths))
+    print(f"Found {len(elite_seed_paths)} unique elite seeds")
+
+    # -- Step 2: Copy elite seeds to pools 0000-0003 --
+    for pool in elite_pools:
+        dest = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
+        os.makedirs(dest, exist_ok=True)
+        for src in elite_seed_paths:
+            shutil.copy(src, dest)
+        print(f"  Pool {pool}: {len(elite_seed_paths)} elite seeds")
+
+    # -- Step 3: Collect ALL seeds from all 4 pools of previous AFL output --
+    try:
+        gen_num = int(gen.replace('gen', '')) - 1
+        gen_str = str(gen_num)
+    except ValueError:
+        gen_str = "0"
+
+    gen_dir_name = resolve_gen_dir(elmfuzz_rundir, gen_str)
+    all_pools = ['0000', '0001', '0002', '0003']
+
+    all_seed_paths = []
+    for pool in all_pools:
+        base_dir = os.path.join(elmfuzz_rundir, gen_dir_name, 'aflnetout', pool)
+        sm = get_seed_map(base_dir)
+        for path in sm.values():
+            if os.path.isfile(path):
+                all_seed_paths.append(path)
+
+    all_seed_paths = sorted(set(all_seed_paths))
+    print(f"Found {len(all_seed_paths)} total seeds across all pools")
+
+    # -- Step 4: Copy all seeds to pools 0004-0007 --
+    for pool in full_pools:
+        dest = os.path.join(elmfuzz_rundir, gen, 'seeds', pool)
+        os.makedirs(dest, exist_ok=True)
+        for src in all_seed_paths:
+            shutil.copy(src, dest)
+        print(f"  Pool {pool}: {len(all_seed_paths)} seeds")
+
+    # -- Step 5: Write selection log --
+    log_dir = os.path.join(elmfuzz_rundir, gen, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    state_log_path = os.path.join(log_dir, 'state.log')
+    with open(state_log_path, 'a') as f:
+        f.write(f"\n=== Generation {gen} (RQ2 Experiment) ===\n")
+        f.write("Pools 0000-0003 (Elite):\n")
+        for p in sorted(elite_seed_paths):
+            f.write(f"  {os.path.basename(p)}\n")
+        f.write(f"\nPools 0004-0007 (Full queue, {len(all_seed_paths)} seeds):\n")
+        for p in sorted(all_seed_paths):
+            f.write(f"  {os.path.basename(p)}\n")
+
+
 @click.command()
 @click.option('--cov_file', '-c', type=click.Path(exists=True), required=True, help='Previous generation coverage file')
 @click.option('--elites_file', '-e', type=click.Path(exists=True), required=True, help='Current generation elite seeds file')
 @click.option('--gen', '-g', type=str, required=True, help='Next generation name')
 @click.option('--noss', is_flag=True, default=False, help='Use current state selection algorithm')
 @click.option('--ss', '-ss', is_flag=True, default=False, help='Use new state selection algorithm')
-def main(cov_file, elites_file, gen, noss, ss):
+@click.option('--rq2-experiment', is_flag=True, default=False, help='RQ2 continuation experiment: elite→0000-0003, all→0004-0007')
+def main(cov_file, elites_file, gen, noss, ss, rq2_experiment):
     elmfuzz_rundir = os.environ.get('ELMFUZZ_RUNDIR')
     if not elmfuzz_rundir:
         print("Error: ELMFuzz_RUNDIR environment variable not set.", file=sys.stderr)
         sys.exit(1)
 
-    if ss:
+    if rq2_experiment:
+        select_states_rq2(cov_file, elites_file, gen, elmfuzz_rundir)
+    elif ss:
         select_states_ss(cov_file, elites_file, gen, elmfuzz_rundir)
     else:
-        # Default to noss if not specified or if noss is specified
         select_states_noss(cov_file, elites_file, gen, elmfuzz_rundir)
 
 if __name__ == '__main__':
