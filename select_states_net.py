@@ -634,7 +634,7 @@ def select_states_rq2(cov_file, elites_file, gen, elmfuzz_rundir):
 
     # -- Step 3: Collect ALL seeds from all 4 pools of previous AFL output --
     try:
-        gen_num = int(gen.replace('gen', '')) - 1
+        gen_num = int(gen.replace('gen', ''))
         gen_str = str(gen_num)
     except ValueError:
         gen_str = "0"

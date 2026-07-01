@@ -1,11 +1,11 @@
 #!/bin/bash
 # RQ2 Continuation Experiment
 # Validate fuzzing-strength preservation of seed selection.
-# From gen2 checkpoint, run gen3 with 8 pools:
+# From gen1 checkpoint, run gen2 with 8 pools:
 #   pools 0000-0003: elite seeds  (selected)
 #   pools 0004-0007: all seeds    (full queue)
 # No LLM mutation, 6h AFL.
-# Then compare gcov coverage: gen2 baseline vs elite vs full.
+# Then compare gcov coverage: gen1 baseline vs gen2 elite vs full.
 #
 # Usage: ./rq2_experiment.sh <target>
 #   where <target> is one of: live555 exim forkeddaapd kamailio proftpd pureftpd
@@ -39,7 +39,7 @@ mkdir -p "$EVAL_DIR"
 # Phase 1: Run gen0-gen3 experiment inside container
 # ============================================================
 echo "[$(date '+%H:%M:%S')] Phase 1: Starting experiment container..."
-echo "  EXPERIMENT_GEN=gen3, NUM_GENERATIONS=3"
+echo "  EXPERIMENT_GEN=gen2, NUM_GENERATIONS=2"
 
 docker run -d \
     --add-host=host.docker.internal:host-gateway \
@@ -48,7 +48,7 @@ docker run -d \
     --name "$CONTAINER_NAME" \
     --entrypoint /bin/bash \
     "$IMAGE_NAME" \
-    -c "cd /home/appuser/elmfuzz && EXPERIMENT_GEN=gen3 SELECTION_STRATEGY=lattice REPROUDCE_MODE=true NUM_GENERATIONS=3 ELMFUZZ_RUNDIR=preset/${TARGET} /home/appuser/elmfuzz/all_gen_net.sh preset/${TARGET}"
+    -c "cd /home/appuser/elmfuzz && EXPERIMENT_GEN=gen2 SELECTION_STRATEGY=lattice REPROUDCE_MODE=true NUM_GENERATIONS=2 ELMFUZZ_RUNDIR=preset/${TARGET} /home/appuser/elmfuzz/all_gen_net.sh preset/${TARGET}"
 
 echo "  Container ID: $(docker ps -qf name=${CONTAINER_NAME})"
 echo ""
@@ -119,35 +119,35 @@ extract_pools() {
     cd - > /dev/null
 }
 
-# Find gen2 and gen3 aflnetout directories
+# Find gen1 (baseline) and gen2 (experiment) aflnetout directories
+GEN1_DIR=$(find "$EVAL_DIR" -type d -path "*/gen1/aflnetout" 2>/dev/null | head -1)
 GEN2_DIR=$(find "$EVAL_DIR" -type d -path "*/gen2/aflnetout" 2>/dev/null | head -1)
-GEN3_DIR=$(find "$EVAL_DIR" -type d -path "*/gen3/aflnetout" 2>/dev/null | head -1)
 
-if [ -z "$GEN2_DIR" ] || [ -z "$GEN3_DIR" ]; then
-    echo "ERROR: Could not find gen2 or gen3 aflnetout directory."
+if [ -z "$GEN1_DIR" ] || [ -z "$GEN2_DIR" ]; then
+    echo "ERROR: Could not find gen1 or gen2 aflnetout directory."
+    echo "  gen1: ${GEN1_DIR:-NOT FOUND}"
     echo "  gen2: ${GEN2_DIR:-NOT FOUND}"
-    echo "  gen3: ${GEN3_DIR:-NOT FOUND}"
     docker rm "$CONTAINER_NAME" > /dev/null 2>&1
     exit 1
 fi
 
-echo "  gen2 dir: $GEN2_DIR"
-echo "  gen3 dir: $GEN3_DIR"
+echo "  gen1 baseline dir: $GEN1_DIR"
+echo "  gen2 experiment dir: $GEN2_DIR"
 
-# --- Gen2 baseline: merge pools 0000-0003 ---
-GEN2_BASELINE="$EVAL_DIR/rq2_gen2_baseline"
-extract_pools "$GEN2_DIR" "$GEN2_BASELINE" "0000" "0001" "0002" "0003"
-echo "  Gen2 baseline: $(find "$GEN2_BASELINE" -type f 2>/dev/null | wc -l) seeds"
+# --- Gen1 baseline: merge pools 0000-0003 ---
+GEN1_BASELINE="$EVAL_DIR/rq2_gen1_baseline"
+extract_pools "$GEN1_DIR" "$GEN1_BASELINE" "0000" "0001" "0002" "0003"
+echo "  Gen1 baseline: $(find "$GEN1_BASELINE" -type f 2>/dev/null | wc -l) seeds"
 
-# --- Gen3 elite: merge pools 0000-0003 ---
-GEN3_ELITE="$EVAL_DIR/rq2_gen3_elite"
-extract_pools "$GEN3_DIR" "$GEN3_ELITE" "0000" "0001" "0002" "0003"
-echo "  Gen3 elite: $(find "$GEN3_ELITE" -type f 2>/dev/null | wc -l) seeds"
+# --- Gen2 elite: merge pools 0000-0003 ---
+GEN2_ELITE="$EVAL_DIR/rq2_gen2_elite"
+extract_pools "$GEN2_DIR" "$GEN2_ELITE" "0000" "0001" "0002" "0003"
+echo "  Gen2 elite: $(find "$GEN2_ELITE" -type f 2>/dev/null | wc -l) seeds"
 
-# --- Gen3 full: merge pools 0004-0007 ---
-GEN3_FULL="$EVAL_DIR/rq2_gen3_full"
-extract_pools "$GEN3_DIR" "$GEN3_FULL" "0004" "0005" "0006" "0007"
-echo "  Gen3 full: $(find "$GEN3_FULL" -type f 2>/dev/null | wc -l) seeds"
+# --- Gen2 full: merge pools 0004-0007 ---
+GEN2_FULL="$EVAL_DIR/rq2_gen2_full"
+extract_pools "$GEN2_DIR" "$GEN2_FULL" "0004" "0005" "0006" "0007"
+echo "  Gen2 full: $(find "$GEN2_FULL" -type f 2>/dev/null | wc -l) seeds"
 
 # ============================================================
 # Phase 5: Run gcov coverage
@@ -223,9 +223,9 @@ run_gcov() {
     fi
 }
 
-run_gcov "baseline" "$GEN2_BASELINE" ""
-run_gcov "elite"   "$GEN3_ELITE"   ""
-run_gcov "full"    "$GEN3_FULL"    ""
+run_gcov "baseline" "$GEN1_BASELINE" ""
+run_gcov "elite"   "$GEN2_ELITE"   ""
+run_gcov "full"    "$GEN2_FULL"    ""
 
 # ============================================================
 # Phase 6: Compare results
@@ -235,9 +235,9 @@ echo "============================================"
 echo "Phase 6: Coverage Comparison"
 echo "============================================"
 
-BASELINE_CSV=$(find "$GEN2_BASELINE" -name "cov_over_time_*.csv" 2>/dev/null | head -1)
-ELITE_CSV=$(find "$GEN3_ELITE" -name "cov_over_time_*.csv" 2>/dev/null | head -1)
-FULL_CSV=$(find "$GEN3_FULL" -name "cov_over_time_*.csv" 2>/dev/null | head -1)
+BASELINE_CSV=$(find "$GEN1_BASELINE" -name "cov_over_time_*.csv" 2>/dev/null | head -1)
+ELITE_CSV=$(find "$GEN2_ELITE" -name "cov_over_time_*.csv" 2>/dev/null | head -1)
+FULL_CSV=$(find "$GEN2_FULL" -name "cov_over_time_*.csv" 2>/dev/null | head -1)
 
 get_final_cov() {
     local csv="$1"
@@ -253,9 +253,9 @@ ELITE_COV=$(get_final_cov "$ELITE_CSV")
 FULL_COV=$(get_final_cov "$FULL_CSV")
 
 echo "Target:           $TARGET"
-echo "Gen2 baseline:    $BASELINE_COV edges  ($(find "$GEN2_BASELINE" -type f | wc -l) seeds)"
-echo "Gen3 elite:       $ELITE_COV edges  ($(find "$GEN3_ELITE" -type f | wc -l) seeds)"
-echo "Gen3 full:        $FULL_COV edges  ($(find "$GEN3_FULL" -type f | wc -l) seeds)"
+echo "Gen1 baseline:    $BASELINE_COV edges  ($(find "$GEN1_BASELINE" -type f | wc -l) seeds)"
+echo "Gen2 elite:       $ELITE_COV edges  ($(find "$GEN2_ELITE" -type f | wc -l) seeds)"
+echo "Gen2 full:        $FULL_COV edges  ($(find "$GEN2_FULL" -type f | wc -l) seeds)"
 
 if [ "$BASELINE_COV" != "N/A" ] && [ "$ELITE_COV" != "N/A" ] && [ "$FULL_COV" != "N/A" ]; then
     ELITE_GAIN=$(echo "$ELITE_COV - $BASELINE_COV" | bc 2>/dev/null || echo "N/A")
