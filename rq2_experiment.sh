@@ -18,9 +18,8 @@ case $TARGET in
     *) echo "Invalid target: $TARGET"; exit 1 ;;
 esac
 
-IMAGE_NAME="tdpfuzztest_np:latest"
+IMAGE_NAME="tdpfuzz:rq2-experiment"
 CONTAINER_NAME="tdpfuzz_rq2_${TARGET}_1"
-HOST_CODE="/home/pzst/LLM-PROTOCOL-FUZZ/TDPFuzz"
 EVAL_DIR="${HOST_CODE}/evaluation/rq2/${TARGET}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -46,7 +45,6 @@ docker run -d \
     --add-host=host.docker.internal:host-gateway \
     -v /tmp/host:/tmp/host \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    -v "${HOST_CODE}:/home/appuser/elmfuzz" \
     --name "$CONTAINER_NAME" \
     --entrypoint /bin/bash \
     "$IMAGE_NAME" \
