@@ -113,7 +113,7 @@ extract_pools() {
     for pool in "${pools[@]}"; do
         local tar_file="aflnetout_${pool}.tar.gz"
         if [ -f "$tar_file" ]; then
-            tar -xzf "$tar_file" -C "$out_dir" --strip-components=1 --wildcards "*/queue" 2>/dev/null || true
+            tar -xzf "$tar_file" -C "$out_dir" --strip-components=1 --transform 's/queue/replayable-queue/' --wildcards "*/queue" 2>/dev/null || true
         fi
     done
     cd - > /dev/null
@@ -167,6 +167,9 @@ run_gcov() {
     local cov_container="${CONTAINER_NAME}_gcov_${label}"
     local input_dir="$(realpath "$seeds_dir")"
     local output_csv="${input_dir}/cov_over_time_${TARGET}_${label}.csv"
+
+    # Ensure gcov image is tagged (it was built as tdpfuzz/$TARGET by prepare_fuzzbench_net.py)
+    docker tag "tdpfuzz/${TARGET}:latest" "live555:profuzzbench" 2>/dev/null || true
 
     case $TARGET in
         live555)
