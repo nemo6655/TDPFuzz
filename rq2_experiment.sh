@@ -113,7 +113,7 @@ extract_pools() {
     for pool in "${pools[@]}"; do
         local tar_file="aflnetout_${pool}.tar.gz"
         if [ -f "$tar_file" ]; then
-            tar -xzf "$tar_file" -C "$out_dir" --strip-components=1 "${pool}/replayable-queue" 2>/dev/null || true
+            tar -xzf "$tar_file" -C "$out_dir" --strip-components=1 --wildcards "*/queue" 2>/dev/null || true
         fi
     done
     cd - > /dev/null
