@@ -112,7 +112,6 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
 
                 cmd = [
                     'docker', 'run', '-d',
-                    '--network', 'host',
                     '--cpus=1',
                     '-v', f'{run_tmp}:/tmp',
                     image,
