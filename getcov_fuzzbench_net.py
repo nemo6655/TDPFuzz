@@ -111,7 +111,8 @@ def main(image: str, input: str,output:str, persist: bool, covfile: str, paralle
                 output_base = f'aflnetout_{safe_job}'
 
                 cmd = [
-                    'docker', 'run', '-d', 
+                    'docker', 'run', '-d',
+                    '--network', 'host',
                     '--cpus=1',
                     '-v', f'{run_tmp}:/tmp',
                     image,

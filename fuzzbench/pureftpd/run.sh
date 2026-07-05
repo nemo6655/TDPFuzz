@@ -26,9 +26,23 @@ if $(strstr $FUZZER "afl"); then
   #Step-1. Do Fuzzing
   #Move to fuzzing folder
   cd $WORKDIR/${TARGET_DIR}
-  timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000+ -i ${INPUTS} -o $OUTDIR -x ${WORKDIR}/ftp.dict -N tcp://127.0.0.1/21 $OPTIONS -c ${WORKDIR}/clean src/pure-ftpd -A
-
-  STATUS=$?
+  MAX_RETRIES=3
+  RETRY=0
+  while [ $RETRY -le $MAX_RETRIES ]; do
+    timeout -k 0 --preserve-status $TIMEOUT /home/ubuntu/${FUZZER}/afl-fuzz -d -m none -t 3000+ -i ${INPUTS} -o $OUTDIR -x ${WORKDIR}/ftp.dict -N tcp://127.0.0.1/21 $OPTIONS -c ${WORKDIR}/clean src/pure-ftpd -A 2>/tmp/afl_stderr.log
+    STATUS=$?
+    if [ $STATUS -eq 0 ]; then
+      break
+    fi
+    if grep -q "All test cases time out" /tmp/afl_stderr.log 2>/dev/null; then
+      RETRY=$((RETRY + 1))
+      echo "[RETRY] $RETRY/$MAX_RETRIES: all test cases timed out, retrying..."
+      rm -rf $OUTDIR
+      sleep 5
+    else
+      break
+    fi
+  done
 
   # #Step-2. Collect code coverage over time
   # #Move to gcov folder
