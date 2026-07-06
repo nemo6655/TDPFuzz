@@ -53,7 +53,7 @@ def model_info():
                 raise
 
 MAX_INPUT_TOKENS = 8000
-CHARS_PER_TOKEN = 3
+CHARS_PER_TOKEN = 2
 
 def truncate_prompt(prompt, max_input_tokens=MAX_INPUT_TOKENS, chars_per_token=CHARS_PER_TOKEN):
     """Truncate prompt to fit within max_input_tokens, keeping head and tail."""
