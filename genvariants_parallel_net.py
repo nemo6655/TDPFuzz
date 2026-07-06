@@ -52,6 +52,19 @@ def model_info():
             else:
                 raise
 
+MAX_INPUT_TOKENS = 8000
+CHARS_PER_TOKEN = 3
+
+def truncate_prompt(prompt, max_input_tokens=MAX_INPUT_TOKENS, chars_per_token=CHARS_PER_TOKEN):
+    """Truncate prompt to fit within max_input_tokens, keeping head and tail."""
+    max_chars = max_input_tokens * chars_per_token
+    if len(prompt) <= max_chars:
+        return prompt
+    keep = max_chars // 2
+    head = prompt[:keep * 2 // 3]
+    tail = prompt[-(keep // 3):]
+    return head + '\n# ... [content truncated to fit context window] ...\n' + tail
+
 def generate_completion(
         prompt,
         temperature=0.2,
@@ -60,11 +73,13 @@ def generate_completion(
         stop=None,
 ):
     """Generate a completion of the prompt."""
+    prompt = truncate_prompt(prompt)
+
     endpoints = get_endpoints()
     endpoint = endpoints.get('codellama/CodeLlama-13b-hf')
     if not endpoint:
         raise ValueError("No endpoint found for codellama/CodeLlama-13b-hf")
-    
+
     data = {
         'inputs': prompt,
         'parameters': {
