@@ -34,9 +34,9 @@ if $(strstr $FUZZER "afl"); then
     if [ $STATUS -eq 0 ]; then
       break
     fi
-    if grep -q "All test cases time out" /tmp/afl_stderr.log 2>/dev/null; then
+    if grep -q "All test cases time out\|Fork server crashed\|PROGRAM ABORT" /tmp/afl_stderr.log 2>/dev/null; then
       RETRY=$((RETRY + 1))
-      echo "[RETRY] $RETRY/$MAX_RETRIES: all test cases timed out, retrying..."
+      echo "[RETRY] $RETRY/$MAX_RETRIES: all test cases timed out or fork server crashed, retrying..."
       rm -rf $OUTDIR
       sleep 5
     else
