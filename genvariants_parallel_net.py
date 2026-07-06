@@ -35,11 +35,22 @@ def get_endpoints() -> Dict[str, str]:
 
 def model_info():
     """Get information about the model."""
+    import time
     endpoints = get_endpoints()
     endpoint = endpoints.get('codellama/CodeLlama-13b-hf')
     if not endpoint:
         raise ValueError("No endpoint found for codellama/CodeLlama-13b-hf")
-    return requests.get(f'{endpoint}/info', timeout=30).json()
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            return requests.get(f'{endpoint}/info', timeout=30).json()
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                print(f"model_info attempt {attempt + 1}/{max_retries} failed: {e}, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+            else:
+                raise
 
 def generate_completion(
         prompt,
@@ -66,23 +77,37 @@ def generate_completion(
     }
     if stop is not None:
         data['parameters']['stop'] = stop
-    try:
-        response = requests.post(f'{endpoint}/generate', json=data, timeout=300)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.Timeout:
-        print(f"Request timed out after 300 seconds", file=sys.stderr)
-        return {"error": "Request timeout"}
-    except requests.exceptions.RequestException as e:
-        error_res = {"error": f"Request failed: {e}"}
-        if e.response is not None:
-            error_res["response_text"] = e.response.text
-        return error_res
-    except requests.exceptions.JSONDecodeError as e:
-        return {
-            "error": f"JSON decode error: {e}",
-            "response_text": response.text
-        }
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(f'{endpoint}/generate', json=data, timeout=300)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.Timeout:
+            print(f"Request timed out after 300s (attempt {attempt + 1}/{max_retries})", file=sys.stderr)
+            if attempt < max_retries - 1:
+                time.sleep(10)
+            else:
+                return {"error": "Request timeout"}
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                print(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}, retrying...", file=sys.stderr)
+                time.sleep(5)
+            else:
+                error_res = {"error": f"Request failed: {e}"}
+                if e.response is not None:
+                    error_res["response_text"] = e.response.text
+                return error_res
+        except requests.exceptions.JSONDecodeError as e:
+            if attempt < max_retries - 1:
+                print(f"JSON decode failed (attempt {attempt + 1}/{max_retries}): {e}, retrying...", file=sys.stderr)
+                time.sleep(5)
+            else:
+                return {
+                    "error": f"JSON decode error: {e}",
+                    "response_text": response.text
+                }
 
 def infilling_prompt_llama(
     pre: str,
