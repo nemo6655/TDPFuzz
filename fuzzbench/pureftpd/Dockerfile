@@ -72,7 +72,7 @@ RUN apt -y install automake
 USER ubuntu
 
 # Set up environment variables for ASAN
-env ASAN_OPTIONS='abort_on_error=0:symbolize=0:detect_leaks=0:detect_stack_use_after_return=1:detect_container_overflow=0:poison_array_cookie=0:malloc_fill_byte=0:max_malloc_fill_size=16777216'
+env ASAN_OPTIONS='abort_on_error=1:symbolize=0:detect_leaks=0:detect_stack_use_after_return=1:detect_container_overflow=0:poison_array_cookie=0:malloc_fill_byte=0:max_malloc_fill_size=16777216'
 
 # Set up PureFTPD for fuzzing
 RUN cd ${WORKDIR} && \
@@ -81,8 +81,8 @@ RUN cd ${WORKDIR} && \
     git checkout c21b45f && \
     patch -p1 < ${WORKDIR}/fuzzing.patch && \
     ./autogen.sh && \
-    CC="afl-clang-fast" CXX="afl-clang-fast++" CFLAGS="-fsanitize=address -g -O0" CXXFLAGS="-fsanitize=address -g -O0" LDFLAGS="-fsanitize=address" ./configure --without-privsep -without-capabilities && \
-    make $MAKE_OPT
+    CC="afl-clang-fast" CXX="afl-clang-fast++" CFLAGS="-g -O0" CXXFLAGS="-g -O0" ./configure --without-privsep -without-capabilities && \
+    AFL_USE_ASAN=1 make $MAKE_OPT
 
 # Set up PureFTPD for coverage analysis
 RUN cd ${WORKDIR} && \
