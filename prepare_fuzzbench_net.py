@@ -186,6 +186,7 @@ def build_image(project_dir: str):
     cmd = [
         'docker',
         'build',
+        '--no-cache',
         '--progress', 'plain',
         '-f', './elm.Dockerfile',
         '-t', f'tdpfuzz/{project_name}',
